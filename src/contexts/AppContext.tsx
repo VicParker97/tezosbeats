@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { Track } from '@/lib/mockData';
 import { useWallet, UseWalletReturn, WalletState } from '@/hooks/useWallet';
 import { useUserNFTs, UseUserNFTsReturn, NFTLoadingState } from '@/hooks/useUserNFTs';
@@ -61,6 +61,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [isMobile, setIsMobile] = useState(false);
   const [demoMode, setDemoMode] = useState(false);
   
+  // Use ref to prevent infinite loops during track updates
+  const isUpdatingTracksRef = useRef(false);
+  
   // Initialize wallet hook
   const wallet = useWallet();
   
@@ -105,6 +108,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
   // Update tracks based on wallet state and NFT data
   useEffect(() => {
+    if (isUpdatingTracksRef.current) {
+      return; // Prevent re-entrant updates
+    }
+    
+    isUpdatingTracksRef.current = true;
+    
     if (wallet.state === WalletState.CONNECTED && !demoMode) {
       // Use real NFT data when wallet is connected and not in demo mode
       if (nfts.loadingState === NFTLoadingState.LOADED) {
@@ -125,15 +134,21 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       // Use empty tracks when wallet is disconnected
       setTracks([]);
     }
+    
+    // Reset the flag after a short delay
+    setTimeout(() => {
+      isUpdatingTracksRef.current = false;
+    }, 100);
   }, [wallet.state, nfts.loadingState, nfts.nfts, demoMode]);
 
   // Reset current track if it's not in the tracks list (separate effect)
   useEffect(() => {
     if (currentTrack && tracks.length > 0 && !tracks.find(t => t.id === currentTrack.id)) {
+      console.log('Resetting current track - not found in tracks list');
       setCurrentTrackState(null);
       setIsPlaying(false);
     }
-  }, [tracks, currentTrack]);
+  }, [tracks]);
 
   // Initialize demo mode from localStorage
   useEffect(() => {

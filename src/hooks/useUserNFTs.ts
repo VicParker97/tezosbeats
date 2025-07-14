@@ -144,7 +144,7 @@ export const useUserNFTs = (walletAddress?: string): UseUserNFTsReturn => {
     } else {
       clearNFTs();
     }
-  }, [walletAddress, fetchNFTs, clearNFTs]);
+  }, [walletAddress]);
 
   // Cleanup cache periodically
   useEffect(() => {
