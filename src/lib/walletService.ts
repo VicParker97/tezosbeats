@@ -11,7 +11,7 @@ export interface WalletService {
 }
 
 class BeaconWalletService implements WalletService {
-  private dAppClient: any = null;
+  private dAppClient: unknown = null;
   private tezos: MavrykToolkit | null = null;
   private initialized = false;
 
@@ -32,7 +32,7 @@ class BeaconWalletService implements WalletService {
       });
 
       // Subscribe to account changes
-      this.dAppClient.subscribeToEvent(BeaconEvent.ACTIVE_ACCOUNT_SET, async (account: any) => {
+      this.dAppClient.subscribeToEvent(BeaconEvent.ACTIVE_ACCOUNT_SET, async (account: unknown) => {
         console.log('Active account set:', account);
       });
 
@@ -189,56 +189,6 @@ class BeaconWalletService implements WalletService {
     }
   }
 }
-
-// Mock wallet service for development/testing
-class MockWalletService implements WalletService {
-  private connected = false;
-  private mockAddress = 'tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb';
-  private mockBalance = '42.50';
-
-  async connect(): Promise<{ address: string; balance: string }> {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    if (typeof window !== 'undefined' && !window.confirm('Mock wallet connection. Click OK to connect, Cancel to simulate rejection.')) {
-      throw new Error('Connection rejected by user');
-    }
-    
-    this.connected = true;
-    
-    return {
-      address: this.mockAddress,
-      balance: `${this.mockBalance} ꜩ`
-    };
-  }
-
-  async disconnect(): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    this.connected = false;
-  }
-
-  async getActiveAccount(): Promise<string | null> {
-    const wasConnected = localStorage.getItem('tezosbeats_wallet_connected');
-    return wasConnected && this.connected ? this.mockAddress : null;
-  }
-
-  async restoreSession(): Promise<{ address: string; balance: string } | null> {
-    const wasConnected = localStorage.getItem('tezosbeats_wallet_connected');
-    if (wasConnected && this.connected) {
-      return {
-        address: this.mockAddress,
-        balance: `${this.mockBalance} ꜩ`
-      };
-    }
-    return null;
-  }
-
-  isAvailable(): boolean {
-    return typeof window !== 'undefined';
-  }
-}
-
-// Use mock wallet for now - Beacon SDK has metrics issues
-// export const walletService = new MockWalletService();
 
 // Use real beacon wallet with GitHub implementation
 export const walletService = new BeaconWalletService();

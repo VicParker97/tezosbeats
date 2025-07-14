@@ -531,12 +531,12 @@ class NFTService {
   }
 
   // Generate a simple audio tone for testing
-  private generateTestAudio(frequency: number = 440): string {
+  private generateTestAudio(freq: number = 440): string {
     try {
       // Create a simple sine wave audio buffer
       const sampleRate = 22050;
       const duration = 3; // 3 seconds
-      const frequency = 440; // A4 note
+      const frequency = freq; // Use parameter frequency
       const samples = sampleRate * duration;
       
       // WAV file header

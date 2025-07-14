@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Track, mockTracks } from '@/lib/mockData';
+import { Track } from '@/lib/mockData';
 import { useWallet, UseWalletReturn, WalletState } from '@/hooks/useWallet';
 import { useUserNFTs, UseUserNFTsReturn, NFTLoadingState } from '@/hooks/useUserNFTs';
 import { MusicNFT } from '@/lib/nftService';
@@ -131,7 +131,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       setCurrentTrackState(null);
       setIsPlaying(false);
     }
-  }, [wallet.state, nfts.loadingState, nfts.nfts, demoMode, currentTrack]);
+  }, [wallet.state, nfts.loadingState, nfts.nfts, demoMode, currentTrack, tracks]);
 
   // Initialize demo mode from localStorage
   useEffect(() => {

@@ -87,7 +87,7 @@ export const useUserNFTs = (walletAddress?: string): UseUserNFTsReturn => {
       setLoadingState(NFTLoadingState.ERROR);
       setNfts([]);
     }
-  }, [cache, retryCount]);
+  }, [cache, retryCount, CACHE_DURATION]);
 
   const refreshNFTs = useCallback(async () => {
     if (!walletAddress) return;
@@ -159,7 +159,7 @@ export const useUserNFTs = (walletAddress?: string): UseUserNFTsReturn => {
     }, 60000); // Clean every minute
 
     return () => clearInterval(cleanupInterval);
-  }, []);
+  }, [CACHE_DURATION]);
 
   return {
     nfts,

@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { Music, Wallet, AlertCircle, RefreshCw } from 'lucide-react';
+import { Music, Wallet, AlertCircle } from 'lucide-react';
 
 interface EmptyStateProps {
   title: string;
@@ -34,9 +34,8 @@ export function EmptyState({ title, description, icon, action }: EmptyStateProps
   );
 }
 
-export function NoMusicNFTsState({ onRefresh, onTryDemo }: { 
+export function NoMusicNFTsState({ onRefresh }: { 
   onRefresh: () => void;
-  onTryDemo: () => void;
 }) {
   return (
     <EmptyState

@@ -4,8 +4,14 @@ import { useApp } from '@/contexts/AppContext';
 import Sidebar from '@/components/Sidebar';
 import MainContent from '@/components/MainContent';
 import Player from '@/components/Player';
+import { useEffect, useState } from 'react';
 
 export default function Home() {
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
   const {
     isDark,
     toggleTheme,
@@ -19,6 +25,14 @@ export default function Home() {
     toggleLike,
     isMobile,
   } = useApp();
+
+  if (!isClient) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex bg-background text-foreground">
