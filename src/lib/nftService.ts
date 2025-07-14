@@ -202,11 +202,11 @@ class NFTService {
     // PRIMARY CHECK: Audio files (most reliable)
     const hasAudioFile = 
       (metadata.artifact_uri && this.isAudioUrl(metadata.artifact_uri)) ||
-      ((metadata as any).artifactUri && this.isAudioUrl((metadata as any).artifactUri)) ||
+      ((metadata as Record<string, unknown>).artifactUri && typeof (metadata as Record<string, unknown>).artifactUri === 'string' && this.isAudioUrl((metadata as Record<string, unknown>).artifactUri as string)) ||
       (metadata.formats && metadata.formats.some(format => 
         this.isAudioMimeType(format.mimeType) || this.isAudioUrl(format.uri)
       )) ||
-      ((metadata as any).mimeType && this.isAudioMimeType((metadata as any).mimeType));
+      ((metadata as Record<string, unknown>).mimeType && typeof (metadata as Record<string, unknown>).mimeType === 'string' && this.isAudioMimeType((metadata as Record<string, unknown>).mimeType as string));
 
     // If it has audio files, it's definitely music
     if (hasAudioFile) {
@@ -222,10 +222,10 @@ class NFTService {
       
       // Must have explicit genre or music-specific attributes
       metadata.genre ||
-      ((metadata as any).genres && (
-        Array.isArray((metadata as any).genres) ? 
-        (metadata as any).genres.length > 0 : 
-        typeof (metadata as any).genres === 'string'
+      ((metadata as Record<string, unknown>).genres && (
+        Array.isArray((metadata as Record<string, unknown>).genres) ? 
+        ((metadata as Record<string, unknown>).genres as unknown[]).length > 0 : 
+        typeof (metadata as Record<string, unknown>).genres === 'string'
       )) ||
       (metadata.attributes && metadata.attributes.some(attr =>
         ['genre', 'bpm', 'tempo', 'key', 'album', 'artist'].includes(attr.name.toLowerCase())
@@ -297,8 +297,8 @@ class NFTService {
     let artist = 'Unknown Artist';
     if (metadata.creators && metadata.creators.length > 0) {
       artist = metadata.creators[0];
-    } else if ((metadata as any).artist) {
-      artist = (metadata as any).artist;
+    } else if ((metadata as Record<string, unknown>).artist && typeof (metadata as Record<string, unknown>).artist === 'string') {
+      artist = (metadata as Record<string, unknown>).artist as string;
     } else if (metadata.attributes) {
       const artistAttr = metadata.attributes.find(attr => 
         ['artist', 'creator', 'author', 'musician', 'producer', 'composer'].includes(attr.name.toLowerCase())
@@ -322,9 +322,9 @@ class NFTService {
       }
     } else if (metadata.formats) {
       // Check formats array for duration
-      const formatWithDuration = metadata.formats.find(format => (format as any).duration);
+      const formatWithDuration = metadata.formats.find(format => (format as Record<string, unknown>).duration);
       if (formatWithDuration) {
-        duration = this.parseDuration((formatWithDuration as any).duration);
+        duration = this.parseDuration((formatWithDuration as Record<string, unknown>).duration as string | number);
       }
     } else if (metadata.attributes) {
       const durationAttr = metadata.attributes.find(attr => 
@@ -337,8 +337,8 @@ class NFTService {
 
     // Extract collection name
     const collection = token.token.contract.alias || 
-                      (metadata as any).collection ||
-                      (metadata as any).album ||
+                      ((metadata as Record<string, unknown>).collection && typeof (metadata as Record<string, unknown>).collection === 'string' ? (metadata as Record<string, unknown>).collection as string : null) ||
+                      ((metadata as Record<string, unknown>).album && typeof (metadata as Record<string, unknown>).album === 'string' ? (metadata as Record<string, unknown>).album as string : null) ||
                       metadata.attributes?.find(attr => 
                         ['collection', 'series', 'album', 'label', 'release'].includes(attr.name.toLowerCase())
                       )?.value ||
@@ -365,13 +365,13 @@ class NFTService {
   private extractImageUrl(metadata: NFTMetadata): string | null {
     const imageFields = [
       metadata.display_uri,
-      (metadata as any).displayUri,
+      ((metadata as Record<string, unknown>).displayUri && typeof (metadata as Record<string, unknown>).displayUri === 'string' ? (metadata as Record<string, unknown>).displayUri as string : null),
       metadata.thumbnail_uri,
-      (metadata as any).thumbnailUri,
+      ((metadata as Record<string, unknown>).thumbnailUri && typeof (metadata as Record<string, unknown>).thumbnailUri === 'string' ? (metadata as Record<string, unknown>).thumbnailUri as string : null),
       metadata.image,
       // Only use artifact_uri if it's actually an image
       metadata.artifact_uri && this.isImageUrl(metadata.artifact_uri) ? metadata.artifact_uri : null,
-      (metadata as any).artifactUri && this.isImageUrl((metadata as any).artifactUri) ? (metadata as any).artifactUri : null
+      ((metadata as Record<string, unknown>).artifactUri && typeof (metadata as Record<string, unknown>).artifactUri === 'string' && this.isImageUrl((metadata as Record<string, unknown>).artifactUri as string)) ? (metadata as Record<string, unknown>).artifactUri as string : null
     ];
 
     for (const field of imageFields) {
@@ -400,8 +400,8 @@ class NFTService {
     }
 
     // Check artifactUri (alternative spelling)
-    if ((metadata as any).artifactUri && this.isAudioUrl((metadata as any).artifactUri)) {
-      return this.resolveIpfsUrl((metadata as any).artifactUri);
+    if ((metadata as Record<string, unknown>).artifactUri && typeof (metadata as Record<string, unknown>).artifactUri === 'string' && this.isAudioUrl((metadata as Record<string, unknown>).artifactUri as string)) {
+      return this.resolveIpfsUrl((metadata as Record<string, unknown>).artifactUri as string);
     }
 
     // Check formats array (TZIP-21 standard)
@@ -415,17 +415,17 @@ class NFTService {
     }
 
     // Check for direct audio field
-    if ((metadata as any).audio && this.isAudioUrl((metadata as any).audio)) {
-      return this.resolveIpfsUrl((metadata as any).audio);
+    if ((metadata as Record<string, unknown>).audio && typeof (metadata as Record<string, unknown>).audio === 'string' && this.isAudioUrl((metadata as Record<string, unknown>).audio as string)) {
+      return this.resolveIpfsUrl((metadata as Record<string, unknown>).audio as string);
     }
 
     // Check for media field array
-    if ((metadata as any).media && Array.isArray((metadata as any).media)) {
-      const audioMedia = (metadata as any).media.find((media: any) => 
-        this.isAudioMimeType(media.mimeType) || this.isAudioUrl(media.uri)
+    if ((metadata as Record<string, unknown>).media && Array.isArray((metadata as Record<string, unknown>).media)) {
+      const audioMedia = ((metadata as Record<string, unknown>).media as Record<string, unknown>[]).find((media: Record<string, unknown>) => 
+        (typeof media.mimeType === 'string' && this.isAudioMimeType(media.mimeType)) || (typeof media.uri === 'string' && this.isAudioUrl(media.uri))
       );
       if (audioMedia) {
-        return this.resolveIpfsUrl(audioMedia.uri);
+        return this.resolveIpfsUrl(audioMedia.uri as string);
       }
     }
 
@@ -536,7 +536,6 @@ class NFTService {
       // Create a simple sine wave audio buffer
       const sampleRate = 22050;
       const duration = 3; // 3 seconds
-      const frequency = freq; // Use parameter frequency
       const samples = sampleRate * duration;
       
       // WAV file header
@@ -567,7 +566,7 @@ class NFTService {
       // Generate sine wave
       for (let i = 0; i < samples; i++) {
         const amplitude = 0.3; // Reduced volume
-        const sample = Math.sin(2 * Math.PI * frequency * i / sampleRate) * amplitude;
+        const sample = Math.sin(2 * Math.PI * freq * i / sampleRate) * amplitude;
         const intSample = Math.round(sample * 32767);
         view.setInt16(44 + i * 2, intSample, true);
       }
@@ -702,22 +701,22 @@ class NFTService {
     }
   }
 
-  private transformObjktToMusicNFT(token: any): MusicNFT {
-    const metadata = token.metadata || {};
-    const title = metadata.name || `Token #${token.token_id}`;
+  private transformObjktToMusicNFT(token: Record<string, unknown>): MusicNFT {
+    const metadata = (token.metadata as Record<string, unknown>) || {};
+    const title = (typeof metadata.name === 'string' ? metadata.name : null) || `Token #${token.token_id}`;
     
     return {
       id: `${token.fa2_address}_${token.token_id}`,
       title,
-      artist: metadata.creators?.[0] || 'Unknown Artist',
-      cover: this.extractImageUrl(metadata) || this.generatePlaceholderCover(title),
-      duration: metadata.duration || 180,
-      collection: metadata.collection || 'Demo Collection',
-      contractAddress: token.fa2_address,
-      tokenId: token.token_id,
-      audioUrl: this.extractAudioUrl(metadata),
+      artist: (Array.isArray(metadata.creators) && typeof metadata.creators[0] === 'string' ? metadata.creators[0] : null) || 'Unknown Artist',
+      cover: this.extractImageUrl(metadata as NFTMetadata) || this.generatePlaceholderCover(title),
+      duration: (typeof metadata.duration === 'number' ? metadata.duration : null) || 180,
+      collection: (typeof metadata.collection === 'string' ? metadata.collection : null) || 'Demo Collection',
+      contractAddress: token.fa2_address as string,
+      tokenId: token.token_id as string,
+      audioUrl: this.extractAudioUrl(metadata as NFTMetadata),
       isLiked: false,
-      metadata
+      metadata: metadata as NFTMetadata
     };
   }
 }

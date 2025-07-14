@@ -11,7 +11,12 @@ export interface WalletService {
 }
 
 class BeaconWalletService implements WalletService {
-  private dAppClient: unknown = null;
+  private dAppClient: { 
+    subscribeToEvent: (event: unknown, callback: (account: unknown) => void) => void;
+    requestPermissions: () => Promise<{ address: string }>;
+    clearActiveAccount: () => Promise<void>;
+    getActiveAccount: () => Promise<{ address: string } | null>;
+  } | null = null;
   private tezos: MavrykToolkit | null = null;
   private initialized = false;
 
@@ -32,12 +37,12 @@ class BeaconWalletService implements WalletService {
       });
 
       // Subscribe to account changes
-      this.dAppClient.subscribeToEvent(BeaconEvent.ACTIVE_ACCOUNT_SET, async (account: unknown) => {
+      (this.dAppClient as { subscribeToEvent: (event: unknown, callback: (account: unknown) => void) => void }).subscribeToEvent(BeaconEvent.ACTIVE_ACCOUNT_SET, async (account: unknown) => {
         console.log('Active account set:', account);
       });
 
       this.tezos = new MavrykToolkit('https://mainnet.api.tez.ie');
-      this.tezos.setWalletProvider(this.dAppClient);
+      this.tezos.setWalletProvider(this.dAppClient as unknown);
       
       console.log('Tezos toolkit initialized:', this.tezos);
       console.log('Tezos.tz available:', !!this.tezos.tz);
@@ -64,7 +69,7 @@ class BeaconWalletService implements WalletService {
       console.log('Requesting wallet permissions...');
       
       // Request permissions using beacon SDK (no network parameter needed)
-      const permissions = await this.dAppClient.requestPermissions();
+      const permissions = await this.dAppClient!.requestPermissions();
       
       console.log('Permissions received:', permissions);
       

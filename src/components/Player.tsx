@@ -79,7 +79,7 @@ export default function Player({
     } else {
       setHasAudio(false);
     }
-  }, [currentTrack]); // Only trigger on track change
+  }, [currentTrack]);
 
   // Handle play/pause when state changes
   useEffect(() => {

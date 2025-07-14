@@ -38,7 +38,7 @@ export interface UseWalletReturn {
   isConnecting: boolean;
   
   // Tezos toolkit for advanced operations
-  tezos: any;
+  tezos: unknown;
 }
 
 export const useWallet = (): UseWalletReturn => {
@@ -106,23 +106,25 @@ export const useWallet = (): UseWalletReturn => {
       // Store connection in localStorage
       localStorage.setItem('tezosbeats_wallet_connected', 'true');
       
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Wallet connection failed:', err);
       
       let errorMessage = 'Failed to connect wallet';
       let errorType: WalletError['type'] = 'connection';
 
-      if (err.message?.includes('not installed')) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      
+      if (errorMsg.includes('not installed')) {
         errorMessage = 'Wallet not installed. Please install Temple or Kukai wallet extension.';
         errorType = 'connection';
-      } else if (err.message?.includes('rejected')) {
+      } else if (errorMsg.includes('rejected')) {
         errorMessage = 'Connection rejected by user';
         errorType = 'permission';
-      } else if (err.message?.includes('network')) {
+      } else if (errorMsg.includes('network')) {
         errorMessage = 'Network connection failed';
         errorType = 'network';
-      } else if (err.message) {
-        errorMessage = err.message;
+      } else if (errorMsg) {
+        errorMessage = errorMsg;
       }
 
       setError({
