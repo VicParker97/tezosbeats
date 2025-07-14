@@ -1,36 +1,140 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TezosBeats 🎵
 
-## Getting Started
+A decentralized music NFT player built on the Tezos blockchain. Discover, play, and enjoy your music NFT collection with a beautiful, responsive interface.
 
-First, run the development server:
+## ✨ Features
 
+- 🎶 **Music NFT Discovery** - Automatically scan your Tezos wallet for music NFTs
+- 🎵 **Built-in Audio Player** - Play your music NFTs with full playback controls
+- 🎨 **Beautiful UI** - Modern, responsive design with dark/light theme support
+- 🔗 **Wallet Integration** - Connect with Temple, Kukai, and other Tezos wallets
+- 📱 **Mobile Responsive** - Optimized for all screen sizes
+- 🧪 **Demo Mode** - Try the app without connecting a wallet
+- ⚡ **Fast Performance** - Built with Next.js 15 and optimized for speed
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js 18+ 
+- npm, yarn, pnpm, or bun
+- A Tezos wallet (Temple, Kukai, etc.) for full functionality
+
+### Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/VicParker97/tezosbeats.git
+cd tezosbeats
+```
+
+2. Install dependencies:
+```bash
+npm install
+# or
+yarn install
+# or
+pnpm install
+```
+
+3. Start the development server:
 ```bash
 npm run dev
 # or
 yarn dev
 # or
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+4. Open [http://localhost:3000](http://localhost:3000) in your browser
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 🎮 Usage
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Connecting Your Wallet
+1. Click "Connect Wallet" in the sidebar
+2. Choose your preferred Tezos wallet
+3. Approve the connection
+4. Your music NFTs will be automatically discovered and loaded
 
-## Learn More
+### Demo Mode
+1. Click "Demo Mode" in the sidebar to try the app without a wallet
+2. Explore the interface with sample music NFTs
+3. Click "Exit Demo" to return to wallet mode
 
-To learn more about Next.js, take a look at the following resources:
+### Playing Music
+1. Browse your music NFT collection
+2. Click any track to start playing
+3. Use the player controls at the bottom for playback control
+4. Use keyboard shortcuts: Space (play/pause), ← (previous), → (next)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🛠️ Tech Stack
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Framework**: Next.js 15 with App Router
+- **Frontend**: React 19, TypeScript
+- **Styling**: Tailwind CSS v4, Radix UI
+- **Blockchain**: Tezos, Taquito, Beacon SDK
+- **Icons**: Lucide React
+- **Deployment**: Vercel
 
-## Deploy on Vercel
+## 🏗️ Architecture
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **`/src/components`** - Reusable UI components
+- **`/src/contexts`** - React context for global state management
+- **`/src/hooks`** - Custom React hooks for wallet and NFT operations
+- **`/src/lib`** - Core services (NFT fetching, wallet integration)
+- **`/src/app`** - Next.js app router pages
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 🎨 Features in Detail
+
+### NFT Discovery
+- Scans your wallet for FA2 tokens on Tezos mainnet
+- Intelligently identifies music NFTs using metadata analysis
+- Supports TZIP-21 standard and various metadata formats
+- Caches results for improved performance
+
+### Audio Playback
+- Extracts audio URLs from NFT metadata
+- Supports common audio formats (MP3, WAV, OGG, etc.)
+- Graceful fallback for NFTs without audio files
+- Keyboard shortcuts and accessibility features
+
+### Wallet Integration
+- Uses Beacon SDK for secure wallet connections
+- Supports major Tezos wallets
+- Handles connection errors gracefully
+- Session persistence across browser refreshes
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the project
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is open source and available under the [MIT License](LICENSE).
+
+## 🔗 Links
+
+- **Live Demo**: [TezosBeats on Vercel](https://your-deployment-url.vercel.app)
+- **GitHub**: [github.com/VicParker97/tezosbeats](https://github.com/VicParker97/tezosbeats)
+
+## 🐛 Known Issues
+
+- Some music NFTs may not have playable audio files
+- IPFS gateway performance may vary
+- Large NFT collections may take time to load initially
+
+## 🙏 Acknowledgments
+
+- Tezos ecosystem for the amazing blockchain infrastructure
+- NFT creators and collectors on Tezos
+- Open source community for the tools and libraries used
+
+---
+
+Built with ❤️ for the Tezos music NFT community
