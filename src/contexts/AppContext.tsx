@@ -125,13 +125,15 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       // Use empty tracks when wallet is disconnected
       setTracks([]);
     }
-    
-    // Reset current track if it's not in the new tracks list
+  }, [wallet.state, nfts.loadingState, nfts.nfts, demoMode]);
+
+  // Reset current track if it's not in the tracks list (separate effect)
+  useEffect(() => {
     if (currentTrack && tracks.length > 0 && !tracks.find(t => t.id === currentTrack.id)) {
       setCurrentTrackState(null);
       setIsPlaying(false);
     }
-  }, [wallet.state, nfts.loadingState, nfts.nfts, demoMode, currentTrack, tracks]);
+  }, [tracks, currentTrack]);
 
   // Initialize demo mode from localStorage
   useEffect(() => {
