@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { nftService, MusicNFT } from '@/lib/nftService';
 
 export enum NFTLoadingState {
@@ -25,7 +25,10 @@ export const useUserNFTs = (walletAddress?: string): UseUserNFTsReturn => {
   const [loadingState, setLoadingState] = useState<NFTLoadingState>(NFTLoadingState.IDLE);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
-  const [cache, setCache] = useState<Map<string, { nfts: MusicNFT[]; timestamp: number }>>(new Map());
+  
+  // Use refs to avoid infinite loops in callbacks
+  const cacheRef = useRef<Map<string, { nfts: MusicNFT[]; timestamp: number }>>(new Map());
+  const retryCountRef = useRef(0);
 
   const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
   const MAX_RETRIES = 3;
@@ -33,8 +36,8 @@ export const useUserNFTs = (walletAddress?: string): UseUserNFTsReturn => {
   const fetchNFTs = useCallback(async (address: string, isRetry = false) => {
     if (!address) return;
 
-    // Check cache first
-    const cached = cache.get(address);
+    // Check cache first using ref
+    const cached = cacheRef.current.get(address);
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
       console.log('Using cached NFTs for', address);
       setNfts(cached.nfts);
@@ -49,19 +52,20 @@ export const useUserNFTs = (walletAddress?: string): UseUserNFTsReturn => {
         setError(null);
       }
 
-      console.log(`Fetching NFTs for wallet: ${address} (attempt ${retryCount + 1})`);
+      console.log(`Fetching NFTs for wallet: ${address} (attempt ${retryCountRef.current + 1})`);
       
       const userNFTs = await nftService.fetchUserNFTs(address);
       
-      // Cache the results
-      setCache(prev => new Map(prev.set(address, {
+      // Cache the results using ref
+      cacheRef.current.set(address, {
         nfts: userNFTs,
         timestamp: Date.now()
-      })));
+      });
 
       setNfts(userNFTs);
       setLoadingState(NFTLoadingState.LOADED);
       setError(null);
+      retryCountRef.current = 0;
       setRetryCount(0);
 
       console.log(`Successfully loaded ${userNFTs.length} music NFTs`);
@@ -71,14 +75,15 @@ export const useUserNFTs = (walletAddress?: string): UseUserNFTsReturn => {
       
       const errorMessage = err instanceof Error ? err.message : 'Failed to load NFTs';
       
-      if (retryCount < MAX_RETRIES) {
-        console.log(`Retrying NFT fetch (${retryCount + 1}/${MAX_RETRIES})...`);
-        setRetryCount(prev => prev + 1);
+      if (retryCountRef.current < MAX_RETRIES) {
+        console.log(`Retrying NFT fetch (${retryCountRef.current + 1}/${MAX_RETRIES})...`);
+        retryCountRef.current += 1;
+        setRetryCount(retryCountRef.current);
         
         // Retry with exponential backoff
         setTimeout(() => {
           fetchNFTs(address, true);
-        }, 1000 * Math.pow(2, retryCount));
+        }, 1000 * Math.pow(2, retryCountRef.current - 1));
         
         return;
       }
@@ -87,18 +92,15 @@ export const useUserNFTs = (walletAddress?: string): UseUserNFTsReturn => {
       setLoadingState(NFTLoadingState.ERROR);
       setNfts([]);
     }
-  }, [cache, retryCount]);
+  }, []);
 
   const refreshNFTs = useCallback(async () => {
     if (!walletAddress) return;
     
-    // Clear cache for this address to force refresh
-    setCache(prev => {
-      const newCache = new Map(prev);
-      newCache.delete(walletAddress);
-      return newCache;
-    });
+    // Clear cache for this address to force refresh using ref
+    cacheRef.current.delete(walletAddress);
     
+    retryCountRef.current = 0;
     setRetryCount(0);
     await fetchNFTs(walletAddress);
   }, [walletAddress, fetchNFTs]);
@@ -113,6 +115,7 @@ export const useUserNFTs = (walletAddress?: string): UseUserNFTsReturn => {
       
       setNfts(demoNFTs);
       setLoadingState(NFTLoadingState.LOADED);
+      retryCountRef.current = 0;
       setRetryCount(0);
       
       console.log(`Loaded ${demoNFTs.length} demo NFTs`);
@@ -128,12 +131,14 @@ export const useUserNFTs = (walletAddress?: string): UseUserNFTsReturn => {
     setNfts([]);
     setLoadingState(NFTLoadingState.IDLE);
     setError(null);
+    retryCountRef.current = 0;
     setRetryCount(0);
   }, []);
 
   // Auto-fetch NFTs when wallet address changes
   useEffect(() => {
     if (walletAddress) {
+      retryCountRef.current = 0;
       setRetryCount(0);
       fetchNFTs(walletAddress);
     } else {
@@ -144,18 +149,15 @@ export const useUserNFTs = (walletAddress?: string): UseUserNFTsReturn => {
   // Cleanup cache periodically
   useEffect(() => {
     const cleanupInterval = setInterval(() => {
-      setCache(prev => {
-        const now = Date.now();
-        const newCache = new Map();
-        
-        for (const [address, data] of prev.entries()) {
-          if (now - data.timestamp < CACHE_DURATION) {
-            newCache.set(address, data);
-          }
+      const now = Date.now();
+      const currentCache = cacheRef.current;
+      
+      // Remove expired entries from cache ref
+      for (const [address, data] of currentCache.entries()) {
+        if (now - data.timestamp >= CACHE_DURATION) {
+          currentCache.delete(address);
         }
-        
-        return newCache;
-      });
+      }
     }, 60000); // Clean every minute
 
     return () => clearInterval(cleanupInterval);
