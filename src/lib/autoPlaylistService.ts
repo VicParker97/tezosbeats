@@ -1,7 +1,7 @@
 'use client';
 
 import { Track } from './mockData';
-import { Playlist, PlaylistWithTracks } from './playlistTypes';
+import { PlaylistWithTracks } from './playlistTypes';
 import { trackStatsService } from './trackStatsService';
 
 export interface AutoPlaylist {

@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useRef, ReactNod
 import { Track } from '@/lib/mockData';
 import { useWallet, UseWalletReturn, WalletState } from '@/hooks/useWallet';
 import { useUserNFTs, UseUserNFTsReturn, NFTLoadingState } from '@/hooks/useUserNFTs';
+import { useTezRadio, UseTezRadioReturn, TezRadioLoadingState } from '@/hooks/useTezRadio';
 import { MusicNFT } from '@/lib/nftService';
 import { Playlist, PlaylistWithTracks, CreatePlaylistRequest, UpdatePlaylistRequest } from '@/lib/playlistTypes';
 import { playlistService } from '@/lib/playlistService';
@@ -25,10 +26,10 @@ interface AppContextType {
   tracks: Track[];
   currentTrack: Track | null;
   isPlaying: boolean;
-  currentTrackIndex: number;
   isShuffled: boolean;
   repeatMode: RepeatMode;
-  shuffledIndices: number[];
+  playQueue: Track[];
+  queueIndex: number;
   
   // Player actions
   setCurrentTrack: (track: Track) => void;
@@ -50,6 +51,9 @@ interface AppContextType {
   // NFTs
   nfts: UseUserNFTsReturn;
   
+  // TezRadio
+  tezRadio: UseTezRadioReturn;
+  
   // Playlists
   playlists: Playlist[];
   autoPlaylists: Playlist[];
@@ -67,8 +71,8 @@ interface AppContextType {
   
   // Track statistics
   recordTrackPlay: (trackId: string, duration?: number, completed?: boolean) => void;
-  getTrackStats: (trackId: string) => any;
-  getOverallStats: () => any;
+  getTrackStats: (trackId: string) => unknown;
+  getOverallStats: () => unknown;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -90,53 +94,38 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [currentTrack, setCurrentTrackState] = useState<Track | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [autoPlaylists, setAutoPlaylists] = useState<Playlist[]>([]);
   const [currentPlaylist, setCurrentPlaylist] = useState<PlaylistWithTracks | null>(null);
   const [isShuffled, setIsShuffled] = useState(false);
   const [repeatMode, setRepeatMode] = useState<RepeatMode>(RepeatMode.NONE);
-  const [shuffledIndices, setShuffledIndices] = useState<number[]>([]);
+  const [playQueue, setPlayQueue] = useState<Track[]>([]);
+  const [queueIndex, setQueueIndex] = useState(0);
   
   // Use ref to prevent infinite loops during track updates
   const isUpdatingTracksRef = useRef(false);
-  
-  // Fisher-Yates shuffle algorithm
-  const shuffleArray = (array: number[]): number[] => {
-    const shuffled = [...array];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled;
-  };
-  
-  // Generate shuffled indices for current track list
-  const generateShuffledIndices = (trackList: Track[]): number[] => {
-    const indices = Array.from({ length: trackList.length }, (_, i) => i);
-    return shuffleArray(indices);
-  };
   
   // Get the current track list based on context
   const getCurrentTrackList = (): Track[] => {
     return currentPlaylist ? currentPlaylist.tracks : tracks;
   };
   
-  // Get the effective track index (considering shuffle)
-  const getEffectiveTrackIndex = (trackList: Track[], logicalIndex: number): number => {
-    if (!isShuffled || shuffledIndices.length === 0) {
-      return logicalIndex;
+  // Generate play queue with optional shuffle
+  const generatePlayQueue = (sourceList: Track[], shuffle: boolean): Track[] => {
+    if (sourceList.length === 0) return [];
+    
+    if (shuffle) {
+      // Fisher-Yates shuffle of actual tracks
+      const shuffled = [...sourceList];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      return shuffled;
     }
-    return shuffledIndices[logicalIndex] || 0;
-  };
-  
-  // Get logical index from actual track index
-  const getLogicalIndex = (trackList: Track[], actualIndex: number): number => {
-    if (!isShuffled || shuffledIndices.length === 0) {
-      return actualIndex;
-    }
-    return shuffledIndices.indexOf(actualIndex);
+    
+    return [...sourceList]; // Copy to avoid mutations
   };
   
   // Initialize wallet hook
@@ -144,6 +133,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   
   // Initialize NFTs hook
   const nfts = useUserNFTs(wallet.walletInfo?.address);
+  
+  // Initialize TezRadio hook with wallet address
+  const tezRadio = useTezRadio(wallet.walletInfo?.address);
   
   // Initialize playlists
   useEffect(() => {
@@ -187,7 +179,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }));
   };
 
-  // Update tracks based on wallet state and NFT data
+  // Update tracks based on wallet state and both NFT sources
   useEffect(() => {
     if (isUpdatingTracksRef.current) {
       return; // Prevent re-entrant updates
@@ -196,25 +188,34 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     isUpdatingTracksRef.current = true;
     
     if (wallet.state === WalletState.CONNECTED) {
-      // Use real NFT data when wallet is connected
-      if (nfts.loadingState === NFTLoadingState.LOADED) {
-        const nftTracks = convertNFTsToTracks(nfts.nfts);
-        setTracks(nftTracks);
-        console.log(`Updated tracks with ${nftTracks.length} NFTs`);
-      } else if (nfts.loadingState === NFTLoadingState.IDLE || nfts.loadingState === NFTLoadingState.LOADING) {
-        // Keep tracks empty while loading
-        setTracks([]);
-      }
+      // Combine tracks from both sources when wallet is connected
+      const nftTracks = nfts.loadingState === NFTLoadingState.LOADED ? convertNFTsToTracks(nfts.nfts) : [];
+      const tezRadioTracks = tezRadio.loadingState === TezRadioLoadingState.LOADED ? convertNFTsToTracks(tezRadio.tracks) : [];
+      
+      // Merge tracks and deduplicate by ID
+      const allTracks = [...nftTracks, ...tezRadioTracks];
+      const uniqueTracks = allTracks.filter((track, index, array) => 
+        array.findIndex(t => t.id === track.id) === index
+      );
+      
+      setTracks(uniqueTracks);
+      console.log(`Updated tracks: ${nftTracks.length} from NFT service + ${tezRadioTracks.length} from TezRadio = ${uniqueTracks.length} total (after deduplication)`);
     } else {
-      // Use empty tracks when wallet is disconnected
+      // Clear everything when wallet is disconnected
       setTracks([]);
+      setCurrentTrackState(null);
+      setIsPlaying(false);
+      setPlayQueue([]);
+      setQueueIndex(0);
+      setCurrentPlaylist(null);
+      console.log('Wallet disconnected - cleared player state');
     }
     
     // Reset the flag after a short delay
     setTimeout(() => {
       isUpdatingTracksRef.current = false;
     }, 100);
-  }, [wallet.state, nfts.loadingState, nfts.nfts]);
+  }, [wallet.state, nfts.loadingState, nfts.nfts, tezRadio.loadingState, tezRadio.tracks]);
 
   // Reset current track if it's not in the tracks list (separate effect)
   useEffect(() => {
@@ -235,14 +236,28 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
 
   const setCurrentTrack = (track: Track) => {
-    const trackList = getCurrentTrackList();
-    const actualIndex = trackList.findIndex(t => t.id === track.id);
+    const sourceList = getCurrentTrackList();
     
-    if (actualIndex >= 0) {
-      const logicalIndex = getLogicalIndex(trackList, actualIndex);
-      setCurrentTrackState(track);
-      setCurrentTrackIndex(logicalIndex);
-      setIsPlaying(true);
+    // Generate queue if needed or if source changed
+    if (playQueue.length === 0 || playQueue.length !== sourceList.length) {
+      const newQueue = generatePlayQueue(sourceList, isShuffled);
+      setPlayQueue(newQueue);
+      
+      // Find track in new queue
+      const trackIndex = newQueue.findIndex(t => t.id === track.id);
+      if (trackIndex >= 0) {
+        setQueueIndex(trackIndex);
+        setCurrentTrackState(track);
+        setIsPlaying(true);
+      }
+    } else {
+      // Find track in current queue
+      const trackIndex = playQueue.findIndex(t => t.id === track.id);
+      if (trackIndex >= 0) {
+        setQueueIndex(trackIndex);
+        setCurrentTrackState(track);
+        setIsPlaying(true);
+      }
     }
   };
 
@@ -251,84 +266,85 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   };
 
   const nextTrack = () => {
-    const trackList = getCurrentTrackList();
+    if (playQueue.length === 0) return;
     
-    if (trackList.length === 0) return;
-    
-    // Handle repeat one mode
+    // Handle repeat one mode - stay on current track
     if (repeatMode === RepeatMode.ONE) {
-      // Stay on the same track
       setIsPlaying(true);
       return;
     }
     
-    let nextLogicalIndex: number;
-    
-    // Check if we're at the end of the list
-    if (currentTrackIndex >= trackList.length - 1) {
+    // Check if at end of queue
+    if (queueIndex >= playQueue.length - 1) {
       if (repeatMode === RepeatMode.ALL) {
-        nextLogicalIndex = 0; // Start from beginning
+        // Go to start of queue
+        setQueueIndex(0);
+        setCurrentTrackState(playQueue[0]);
+        setIsPlaying(true);
       } else {
         // No repeat - stop playing
         setIsPlaying(false);
-        return;
       }
-    } else {
-      nextLogicalIndex = currentTrackIndex + 1;
+      return;
     }
     
-    const actualIndex = getEffectiveTrackIndex(trackList, nextLogicalIndex);
-    setCurrentTrackState(trackList[actualIndex]);
-    setCurrentTrackIndex(nextLogicalIndex);
+    // Move to next track in queue
+    const nextIndex = queueIndex + 1;
+    setQueueIndex(nextIndex);
+    setCurrentTrackState(playQueue[nextIndex]);
     setIsPlaying(true);
   };
 
   const previousTrack = () => {
-    const trackList = getCurrentTrackList();
+    if (playQueue.length === 0) return;
     
-    if (trackList.length === 0) return;
-    
-    // Handle repeat one mode
+    // Handle repeat one mode - stay on current track
     if (repeatMode === RepeatMode.ONE) {
-      // Stay on the same track
       setIsPlaying(true);
       return;
     }
     
-    const prevLogicalIndex = currentTrackIndex === 0 ? trackList.length - 1 : currentTrackIndex - 1;
-    const actualIndex = getEffectiveTrackIndex(trackList, prevLogicalIndex);
+    // Check if at beginning of queue
+    if (queueIndex <= 0) {
+      if (repeatMode === RepeatMode.ALL) {
+        // Go to end of queue
+        const lastIndex = playQueue.length - 1;
+        setQueueIndex(lastIndex);
+        setCurrentTrackState(playQueue[lastIndex]);
+        setIsPlaying(true);
+      } else {
+        // No repeat - stop playing or stay at first track
+        setIsPlaying(false);
+      }
+      return;
+    }
     
-    setCurrentTrackState(trackList[actualIndex]);
-    setCurrentTrackIndex(prevLogicalIndex);
+    // Move to previous track in queue
+    const prevIndex = queueIndex - 1;
+    setQueueIndex(prevIndex);
+    setCurrentTrackState(playQueue[prevIndex]);
     setIsPlaying(true);
   };
 
   const toggleShuffle = () => {
-    const trackList = getCurrentTrackList();
+    const sourceList = getCurrentTrackList();
+    if (sourceList.length === 0) return;
     
-    if (!isShuffled) {
-      // Turning shuffle on
-      const newShuffledIndices = generateShuffledIndices(trackList);
-      setShuffledIndices(newShuffledIndices);
-      setIsShuffled(true);
-      
-      // Update current track index to maintain current song
-      if (currentTrack) {
-        const actualIndex = trackList.findIndex(t => t.id === currentTrack.id);
-        const newLogicalIndex = newShuffledIndices.indexOf(actualIndex);
-        setCurrentTrackIndex(newLogicalIndex);
-      }
-    } else {
-      // Turning shuffle off
-      setIsShuffled(false);
-      setShuffledIndices([]);
-      
-      // Update current track index to maintain current song
-      if (currentTrack) {
-        const actualIndex = trackList.findIndex(t => t.id === currentTrack.id);
-        setCurrentTrackIndex(actualIndex);
-      }
+    const newShuffleState = !isShuffled;
+    
+    // Generate new queue with shuffle state
+    const newQueue = generatePlayQueue(sourceList, newShuffleState);
+    
+    // Find current track in new queue
+    let newIndex = 0;
+    if (currentTrack) {
+      newIndex = newQueue.findIndex(t => t.id === currentTrack.id);
+      if (newIndex === -1) newIndex = 0;
     }
+    
+    setIsShuffled(newShuffleState);
+    setPlayQueue(newQueue);
+    setQueueIndex(newIndex);
   };
   
   const toggleRepeat = () => {
@@ -460,26 +476,31 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracks, currentPlaylist?.id, currentPlaylist?.tracks.length]);
   
-  // Update shuffled indices when track list changes
+  // Update play queue when track list changes
   useEffect(() => {
-    if (isShuffled) {
-      const trackList = getCurrentTrackList();
-      if (trackList.length > 0) {
-        const newShuffledIndices = generateShuffledIndices(trackList);
-        setShuffledIndices(newShuffledIndices);
+    const sourceList = getCurrentTrackList();
+    
+    if (sourceList.length > 0) {
+      // Regenerate queue when source changes significantly
+      if (playQueue.length !== sourceList.length) {
+        const newQueue = generatePlayQueue(sourceList, isShuffled);
+        setPlayQueue(newQueue);
         
         // Maintain current track if it exists
         if (currentTrack) {
-          const actualIndex = trackList.findIndex(t => t.id === currentTrack.id);
-          if (actualIndex >= 0) {
-            const newLogicalIndex = newShuffledIndices.indexOf(actualIndex);
-            setCurrentTrackIndex(newLogicalIndex);
-          }
+          const trackIndex = newQueue.findIndex(t => t.id === currentTrack.id);
+          setQueueIndex(trackIndex >= 0 ? trackIndex : 0);
+        } else {
+          setQueueIndex(0);
         }
       }
+    } else {
+      // Clear queue when no tracks
+      setPlayQueue([]);
+      setQueueIndex(0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tracks, currentPlaylist?.tracks, isShuffled]);
+  }, [tracks.length, currentPlaylist?.tracks.length]);
 
   const value: AppContextType = {
     // Theme
@@ -490,10 +511,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     tracks,
     currentTrack,
     isPlaying,
-    currentTrackIndex,
     isShuffled,
     repeatMode,
-    shuffledIndices,
+    playQueue,
+    queueIndex,
     
     // Player actions
     setCurrentTrack,
@@ -514,6 +535,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     
     // NFTs
     nfts,
+    
+    // TezRadio
+    tezRadio,
     
     // Playlists
     playlists,

@@ -3,11 +3,11 @@
 import { useApp } from '@/contexts/AppContext';
 import Sidebar from '@/components/Sidebar';
 import MainContent from '@/components/MainContent';
-import Player from '@/components/Player';
+import AudioPlayer from '@/components/AudioPlayer';
 import { useEffect, useState } from 'react';
 import { WalletState } from '@/hooks/useWallet';
 import { Button } from '@/components/ui/button';
-import { Menu, X } from 'lucide-react';
+import { Menu } from 'lucide-react';
 
 export default function Home() {
   const [isClient, setIsClient] = useState(false);
@@ -24,9 +24,6 @@ export default function Home() {
     currentTrack,
     isPlaying,
     setCurrentTrack,
-    togglePlayPause,
-    nextTrack,
-    previousTrack,
     toggleLike,
     isMobile,
     wallet,
@@ -48,15 +45,17 @@ export default function Home() {
   }
 
   return (
-    <div className="h-screen flex bg-background text-foreground">
+    <div className="min-h-screen flex bg-background text-foreground">
       {/* Desktop Sidebar */}
       {!isMobile && (
-        <Sidebar 
-          onThemeToggle={toggleTheme} 
-          isDark={isDark} 
-          activeSection={activeSection}
-          onSectionChange={setActiveSection}
-        />
+        <div className="sticky top-0 h-screen">
+          <Sidebar 
+            onThemeToggle={toggleTheme} 
+            isDark={isDark} 
+            activeSection={activeSection}
+            onSectionChange={setActiveSection}
+          />
+        </div>
       )}
 
       {/* Mobile Header */}
@@ -124,14 +123,8 @@ export default function Home() {
         />
       </div>
 
-      {/* Player */}
-      <Player
-        currentTrack={currentTrack}
-        isPlaying={isPlaying}
-        onPlayPause={togglePlayPause}
-        onNext={nextTrack}
-        onPrevious={previousTrack}
-      />
+      {/* Audio Player (Hidden) */}
+      <AudioPlayer />
 
       {/* Mobile Sidebar Overlay */}
       {isMobile && (

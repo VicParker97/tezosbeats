@@ -1,5 +1,7 @@
 'use client';
 
+import { metadataEnhancer } from './metadataEnhancer';
+
 export interface NFTMetadata {
   name?: string;
   description?: string;
@@ -186,8 +188,8 @@ class NFTService {
         return null;
       }
 
-      // Transform to MusicNFT format
-      const musicNFT = this.transformToMusicNFT(token, metadata);
+      // Transform to MusicNFT format using enhanced metadata
+      const musicNFT = await this.transformToMusicNFT(token, metadata);
       return musicNFT;
 
     } catch (error) {
@@ -289,76 +291,39 @@ class NFTService {
     return musicKeywords.some(keyword => lowerText.includes(keyword));
   }
 
-  private transformToMusicNFT(token: TzKTToken, metadata: NFTMetadata): MusicNFT {
-    // Extract title
-    const title = metadata.name || `Token #${token.token.tokenId}`;
-    
-    // Extract artist from various fields
-    let artist = 'Unknown Artist';
-    if (metadata.creators && metadata.creators.length > 0) {
-      artist = metadata.creators[0];
-    } else if ((metadata as Record<string, unknown>).artist && typeof (metadata as Record<string, unknown>).artist === 'string') {
-      artist = (metadata as Record<string, unknown>).artist as string;
-    } else if (metadata.attributes) {
-      const artistAttr = metadata.attributes.find(attr => 
-        ['artist', 'creator', 'author', 'musician', 'producer', 'composer'].includes(attr.name.toLowerCase())
-      );
-      if (artistAttr) {
-        artist = artistAttr.value;
-      }
-    }
+  private async transformToMusicNFT(token: TzKTToken, metadata: NFTMetadata): Promise<MusicNFT> {
+    // Use enhanced metadata that prioritizes TezRadio data
+    const enhancedMetadata = await metadataEnhancer.enhanceMetadata(
+      token.token.contract.address,
+      token.token.tokenId,
+      metadata
+    );
 
-    // Extract cover image
-    const cover = this.extractImageUrl(metadata) || this.generatePlaceholderCover(title);
+    // Extract cover image (prefer enhanced data, fallback to extraction)
+    const cover = enhancedMetadata.cover || 
+                  this.extractImageUrl(metadata) || 
+                  this.generatePlaceholderCover(enhancedMetadata.title);
 
-    // Extract duration with better parsing
-    let duration = 180; // Default 3 minutes
-    if (metadata.duration) {
-      if (typeof metadata.duration === 'number') {
-        duration = metadata.duration;
-      } else if (typeof metadata.duration === 'string') {
-        // Parse various duration formats: "03:45", "00:03:45", "225" (seconds)
-        duration = this.parseDuration(metadata.duration);
-      }
-    } else if (metadata.formats) {
-      // Check formats array for duration
-      const formatWithDuration = metadata.formats.find(format => (format as Record<string, unknown>).duration);
-      if (formatWithDuration) {
-        duration = this.parseDuration((formatWithDuration as Record<string, unknown>).duration as string | number);
-      }
-    } else if (metadata.attributes) {
-      const durationAttr = metadata.attributes.find(attr => 
-        ['duration', 'length', 'time'].includes(attr.name.toLowerCase())
-      );
-      if (durationAttr) {
-        duration = this.parseDuration(durationAttr.value);
-      }
-    }
-
-    // Extract collection name
-    const collection = token.token.contract.alias || 
-                      ((metadata as Record<string, unknown>).collection && typeof (metadata as Record<string, unknown>).collection === 'string' ? (metadata as Record<string, unknown>).collection as string : null) ||
-                      ((metadata as Record<string, unknown>).album && typeof (metadata as Record<string, unknown>).album === 'string' ? (metadata as Record<string, unknown>).album as string : null) ||
-                      metadata.attributes?.find(attr => 
-                        ['collection', 'series', 'album', 'label', 'release'].includes(attr.name.toLowerCase())
-                      )?.value ||
-                      `Collection ${token.token.contract.address.slice(0, 8)}`;
-
-    // Extract audio URL
-    const audioUrl = this.extractAudioUrl(metadata);
+    // Extract audio URL (prefer enhanced data, fallback to extraction)
+    const audioUrl = enhancedMetadata.audioUrl || this.extractAudioUrl(metadata);
 
     return {
       id: `${token.token.contract.address}_${token.token.tokenId}`,
-      title,
-      artist,
+      title: enhancedMetadata.title,
+      artist: enhancedMetadata.artist,
       cover,
-      duration,
-      collection,
+      duration: enhancedMetadata.duration,
+      collection: enhancedMetadata.collection || token.token.contract.alias || `Collection ${token.token.contract.address.slice(0, 8)}`,
       contractAddress: token.token.contract.address,
       tokenId: token.token.tokenId,
       audioUrl,
       isLiked: false,
-      metadata
+      metadata: {
+        ...metadata,
+        // Add enhanced metadata info
+        _enhanced: true,
+        _enhancedSource: enhancedMetadata.source
+      }
     };
   }
 

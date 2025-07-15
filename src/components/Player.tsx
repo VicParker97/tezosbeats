@@ -52,9 +52,8 @@ export default function Player({
   const [hasAudio, setHasAudio] = useState(false);
   const [audioError, setAudioError] = useState(false);
   const [isReady, setIsReady] = useState(false);
-  const [trackStartTime, setTrackStartTime] = useState<number | null>(null);
   
-  const { isShuffled, repeatMode, toggleShuffle, toggleRepeat, currentPlaylist, recordTrackPlay } = useApp();
+  const { isShuffled, repeatMode, toggleShuffle, toggleRepeat, currentPlaylist } = useApp();
 
   // Reset states when track changes
   useEffect(() => {

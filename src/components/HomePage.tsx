@@ -1,6 +1,6 @@
 'use client';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -10,8 +10,6 @@ import {
   ListMusic,
   Headphones,
   Shield,
-  Zap,
-  Users,
   Star,
   ArrowRight,
   CheckCircle,
@@ -166,7 +164,7 @@ export default function HomePage({ onSectionChange }: HomePageProps) {
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-12">
           <h3 className="text-3xl font-bold mb-4">Get Started in 3 Steps</h3>
-          <p className="text-muted-foreground text-lg">It's that simple</p>
+          <p className="text-muted-foreground text-lg">It&apos;s that simple</p>
         </div>
         
         <div className="grid md:grid-cols-3 gap-8">

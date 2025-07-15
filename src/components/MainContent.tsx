@@ -1,10 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, Music, Heart, Package, Wallet, Loader2, AlertCircle, RefreshCw, ListMusic } from 'lucide-react';
+import { Search, Music, Wallet, Loader2, AlertCircle, RefreshCw, ListMusic } from 'lucide-react';
 import PlaylistManager from './PlaylistManager';
 import PlaylistEditor from './PlaylistEditor';
 import HomePage from './HomePage';
@@ -38,7 +37,7 @@ export default function MainContent({
 }: MainContentProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [editingPlaylist, setEditingPlaylist] = useState<Playlist | null>(null);
-  const { wallet, nfts, currentPlaylist, playlists } = useApp();
+  const { wallet, nfts, currentPlaylist } = useApp();
   
 
   const filteredTracks = tracks.filter(track =>
@@ -158,7 +157,7 @@ export default function MainContent({
   };
 
   return (
-    <div className={`flex-1 p-3 md:p-6 overflow-y-auto ${currentTrack ? 'pb-20' : 'pb-3'}`}>
+    <div className="flex-1 p-3 md:p-6 overflow-y-auto">
 
       {/* Render content based on active section */}
       {activeSection === 'home' ? (
