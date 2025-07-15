@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 // import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Heart, MoreHorizontal, Play, Pause } from 'lucide-react';
+import { Heart, Play, Pause, Plus } from 'lucide-react';
+import PlaylistAddDialog from './PlaylistAddDialog';
 
 interface Track {
   id: string;
@@ -33,6 +34,7 @@ export default function TrackItem({
   onLike 
 }: TrackItemProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const [showPlaylistDialog, setShowPlaylistDialog] = useState(false);
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -47,6 +49,11 @@ export default function TrackItem({
   const handleLikeClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     onLike(track.id);
+  };
+  
+  const handleAddToPlaylist = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowPlaylistDialog(true);
   };
 
   return (
@@ -112,7 +119,7 @@ export default function TrackItem({
       </div>
 
       {/* Actions */}
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200">
+      <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200">
         <Button
           variant="ghost"
           size="icon"
@@ -124,11 +131,20 @@ export default function TrackItem({
         <Button
           variant="ghost"
           size="icon"
-          className="w-6 h-6 md:w-8 md:h-8 text-muted-foreground hidden md:inline-flex"
+          onClick={handleAddToPlaylist}
+          className="w-6 h-6 md:w-8 md:h-8 text-muted-foreground hover:text-primary transition-colors"
+          title="Add to playlist"
         >
-          <MoreHorizontal className="w-4 h-4" />
+          <Plus className="w-3 h-3 md:w-4 md:h-4" />
         </Button>
       </div>
+      
+      {/* Playlist Add Dialog */}
+      <PlaylistAddDialog
+        track={track}
+        isOpen={showPlaylistDialog}
+        onClose={() => setShowPlaylistDialog(false)}
+      />
     </div>
   );
 }

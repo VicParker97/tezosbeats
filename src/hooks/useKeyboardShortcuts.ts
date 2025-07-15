@@ -9,6 +9,8 @@ interface KeyboardShortcuts {
   onVolumeUp?: () => void;
   onVolumeDown?: () => void;
   onMute?: () => void;
+  onToggleShuffle?: () => void;
+  onToggleRepeat?: () => void;
 }
 
 export function useKeyboardShortcuts({
@@ -18,6 +20,8 @@ export function useKeyboardShortcuts({
   onVolumeUp,
   onVolumeDown,
   onMute,
+  onToggleShuffle,
+  onToggleRepeat,
 }: KeyboardShortcuts) {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -31,7 +35,7 @@ export function useKeyboardShortcuts({
       }
 
       // Prevent default behavior for handled keys
-      const preventKeys = [' ', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'm', 'M'];
+      const preventKeys = [' ', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'm', 'M', 's', 'S', 'r', 'R'];
       if (preventKeys.includes(event.key)) {
         event.preventDefault();
       }
@@ -56,6 +60,14 @@ export function useKeyboardShortcuts({
         case 'M': // M for mute/unmute
           onMute?.();
           break;
+        case 's':
+        case 'S': // S for shuffle toggle
+          onToggleShuffle?.();
+          break;
+        case 'r':
+        case 'R': // R for repeat toggle
+          onToggleRepeat?.();
+          break;
       }
     };
 
@@ -64,5 +76,5 @@ export function useKeyboardShortcuts({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [onPlayPause, onNext, onPrevious, onVolumeUp, onVolumeDown, onMute]);
+  }, [onPlayPause, onNext, onPrevious, onVolumeUp, onVolumeDown, onMute, onToggleShuffle, onToggleRepeat]);
 }

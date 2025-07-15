@@ -5,13 +5,17 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { useApp, RepeatMode } from '@/contexts/AppContext';
 import { 
   SkipBack, 
   Play, 
   Pause, 
   SkipForward, 
   Volume2,
-  VolumeX
+  VolumeX,
+  Shuffle,
+  Repeat,
+  Repeat1
 } from 'lucide-react';
 
 interface Track {
@@ -48,6 +52,9 @@ export default function Player({
   const [hasAudio, setHasAudio] = useState(false);
   const [audioError, setAudioError] = useState(false);
   const [isReady, setIsReady] = useState(false);
+  const [trackStartTime, setTrackStartTime] = useState<number | null>(null);
+  
+  const { isShuffled, repeatMode, toggleShuffle, toggleRepeat, currentPlaylist, recordTrackPlay } = useApp();
 
   // Reset states when track changes
   useEffect(() => {
@@ -206,7 +213,22 @@ export default function Player({
     onVolumeUp: handleVolumeUp,
     onVolumeDown: handleVolumeDown,
     onMute: handleVolumeToggle,
+    onToggleShuffle: toggleShuffle,
+    onToggleRepeat: toggleRepeat,
   });
+  
+  const getRepeatIcon = () => {
+    switch (repeatMode) {
+      case RepeatMode.ONE:
+        return Repeat1;
+      case RepeatMode.ALL:
+      case RepeatMode.NONE:
+      default:
+        return Repeat;
+    }
+  };
+  
+  const RepeatIcon = getRepeatIcon();
 
   if (!currentTrack) {
     return null;
@@ -240,6 +262,11 @@ export default function Player({
           <h3 className="font-medium text-foreground truncate text-sm md:text-base">{currentTrack.title}</h3>
           <p className="text-xs md:text-sm text-muted-foreground truncate">
             {currentTrack.artist}
+            {currentPlaylist && (
+              <span className="ml-2 opacity-75">
+                • Playing from {currentPlaylist.name}
+              </span>
+            )}
             {!hasAudio && <span className="ml-2 text-yellow-500">• No audio</span>}
             {audioError && <span className="ml-2 text-red-500">• Audio error</span>}
             {isLoading && <span className="ml-2 text-blue-500">• Loading...</span>}
@@ -250,6 +277,16 @@ export default function Player({
       {/* Controls */}
       <div className="flex flex-col items-center gap-1 md:gap-2 flex-1 max-w-sm md:max-w-md touch-manipulation">
         <div className="flex items-center gap-1 md:gap-2">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={toggleShuffle}
+            className={`w-7 h-7 md:w-8 md:h-8 transition-all duration-200 hover:scale-110 active:scale-95 ${isShuffled ? 'text-primary' : 'text-muted-foreground'}`}
+            aria-label="Toggle shuffle"
+            title={`Shuffle: ${isShuffled ? 'On' : 'Off'} (S)`}
+          >
+            <Shuffle className="w-3 h-3 md:w-4 md:h-4" />
+          </Button>
           <Button 
             variant="ghost" 
             size="icon" 
@@ -286,6 +323,16 @@ export default function Player({
             title="Next track (→)"
           >
             <SkipForward className="w-3 h-3 md:w-4 md:h-4" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={toggleRepeat}
+            className={`w-7 h-7 md:w-8 md:h-8 transition-all duration-200 hover:scale-110 active:scale-95 ${repeatMode !== RepeatMode.NONE ? 'text-primary' : 'text-muted-foreground'}`}
+            aria-label="Toggle repeat"
+            title={`Repeat: ${repeatMode === RepeatMode.NONE ? 'Off' : repeatMode === RepeatMode.ALL ? 'All' : 'One'} (R)`}
+          >
+            <RepeatIcon className="w-3 h-3 md:w-4 md:h-4" />
           </Button>
         </div>
 

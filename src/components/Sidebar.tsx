@@ -15,26 +15,42 @@ import {
   Wallet,
   Loader2,
   AlertCircle,
-  FlaskConical
+  ListMusic,
+  X,
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { WalletState } from '@/hooks/useWallet';
 import KeyboardShortcutsHelp from './KeyboardShortcutsHelp';
+import PlaylistModal from './PlaylistModal';
 
 interface SidebarProps {
   onThemeToggle: () => void;
   isDark: boolean;
+  activeSection?: string;
+  onSectionChange?: (section: string) => void;
+  isMobile?: boolean;
+  onClose?: () => void;
 }
 
-export default function Sidebar({ onThemeToggle, isDark }: SidebarProps) {
+export default function Sidebar({ 
+  onThemeToggle, 
+  isDark, 
+  activeSection = 'home',
+  onSectionChange,
+  isMobile = false,
+  onClose
+}: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [activeItem, setActiveItem] = useState('home');
-  const { wallet, demoMode, toggleDemoMode } = useApp();
+  const [showPlaylistModal, setShowPlaylistModal] = useState(false);
+  const { wallet } = useApp();
 
   const navigationItems = [
     { id: 'home', label: 'Home', icon: Home },
-    { id: 'nfts', label: 'Meine NFTs', icon: Disc },
-    { id: 'search', label: 'Suchen', icon: Search },
+    ...(wallet.state === WalletState.CONNECTED ? [
+      { id: 'nfts', label: 'Meine NFTs', icon: Disc },
+      { id: 'playlists', label: 'Playlists', icon: ListMusic, onClick: () => setShowPlaylistModal(true) },
+      { id: 'search', label: 'Suchen', icon: Search },
+    ] : [])
   ];
 
   return (
@@ -47,14 +63,25 @@ export default function Sidebar({ onThemeToggle, isDark }: SidebarProps) {
             <h1 className="text-xl font-bold text-foreground">TezosBeats</h1>
           )}
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className="w-8 h-8"
-        >
-          {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-        </Button>
+        {isMobile ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="w-8 h-8"
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="w-8 h-8"
+          >
+            {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          </Button>
+        )}
       </div>
 
       <Separator />
@@ -66,9 +93,15 @@ export default function Sidebar({ onThemeToggle, isDark }: SidebarProps) {
           return (
             <Button
               key={item.id}
-              variant={activeItem === item.id ? 'secondary' : 'ghost'}
+              variant={activeSection === item.id ? 'secondary' : 'ghost'}
               className={`w-full ${isCollapsed ? 'justify-center px-2' : 'justify-start'} h-10`}
-              onClick={() => setActiveItem(item.id)}
+              onClick={() => {
+                if (item.onClick) {
+                  item.onClick();
+                } else {
+                  onSectionChange?.(item.id);
+                }
+              }}
             >
               <Icon className="w-4 h-4" />
               {!isCollapsed && <span className="ml-3">{item.label}</span>}
@@ -81,17 +114,6 @@ export default function Sidebar({ onThemeToggle, isDark }: SidebarProps) {
 
       {/* Bottom section */}
       <div className="p-4 space-y-2">
-        {/* Demo Mode Toggle */}
-        <Button
-          variant={demoMode ? "secondary" : "ghost"}
-          size={isCollapsed ? 'icon' : 'default'}
-          onClick={toggleDemoMode}
-          className={`w-full ${isCollapsed ? 'justify-center px-2' : 'justify-start'} h-10`}
-        >
-          <FlaskConical className="w-4 h-4" />
-          {!isCollapsed && <span className="ml-3">{demoMode ? 'Exit Demo' : 'Demo Mode'}</span>}
-        </Button>
-
         {/* Theme and Shortcuts */}
         <div className="flex gap-2">
           <Button
@@ -164,6 +186,15 @@ export default function Sidebar({ onThemeToggle, isDark }: SidebarProps) {
           </div>
         )}
       </div>
+
+      {/* Playlist Modal */}
+      <PlaylistModal
+        isOpen={showPlaylistModal}
+        onClose={() => setShowPlaylistModal(false)}
+        onPlaylistSelect={(playlist) => {
+          onSectionChange?.('playlists');
+        }}
+      />
     </div>
   );
 }

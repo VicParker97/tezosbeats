@@ -15,10 +15,13 @@ export interface UseUserNFTsReturn {
   loadingState: NFTLoadingState;
   error: string | null;
   refreshNFTs: () => Promise<void>;
-  loadDemoNFTs: () => Promise<void>;
   clearNFTs: () => void;
   retryCount: number;
 }
+
+// Constants outside the hook to avoid dependency issues
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const MAX_RETRIES = 3;
 
 export const useUserNFTs = (walletAddress?: string): UseUserNFTsReturn => {
   const [nfts, setNfts] = useState<MusicNFT[]>([]);
@@ -29,9 +32,6 @@ export const useUserNFTs = (walletAddress?: string): UseUserNFTsReturn => {
   // Use refs to avoid infinite loops in callbacks
   const cacheRef = useRef<Map<string, { nfts: MusicNFT[]; timestamp: number }>>(new Map());
   const retryCountRef = useRef(0);
-
-  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-  const MAX_RETRIES = 3;
 
   const fetchNFTs = useCallback(async (address: string, isRetry = false) => {
     if (!address) return;
@@ -92,7 +92,7 @@ export const useUserNFTs = (walletAddress?: string): UseUserNFTsReturn => {
       setLoadingState(NFTLoadingState.ERROR);
       setNfts([]);
     }
-  }, []);
+  }, []); // Constants are stable
 
   const refreshNFTs = useCallback(async () => {
     if (!walletAddress) return;
@@ -103,29 +103,8 @@ export const useUserNFTs = (walletAddress?: string): UseUserNFTsReturn => {
     retryCountRef.current = 0;
     setRetryCount(0);
     await fetchNFTs(walletAddress);
-  }, [walletAddress, fetchNFTs]);
+  }, [walletAddress, fetchNFTs]); // fetchNFTs is stable
 
-  const loadDemoNFTs = useCallback(async () => {
-    try {
-      setLoadingState(NFTLoadingState.LOADING);
-      setError(null);
-      
-      console.log('Loading demo NFTs...');
-      const demoNFTs = await nftService.fetchDemoNFTs();
-      
-      setNfts(demoNFTs);
-      setLoadingState(NFTLoadingState.LOADED);
-      retryCountRef.current = 0;
-      setRetryCount(0);
-      
-      console.log(`Loaded ${demoNFTs.length} demo NFTs`);
-      
-    } catch (err) {
-      console.error('Failed to load demo NFTs:', err);
-      setError('Failed to load demo NFTs');
-      setLoadingState(NFTLoadingState.ERROR);
-    }
-  }, []);
 
   const clearNFTs = useCallback(() => {
     setNfts([]);
@@ -144,7 +123,7 @@ export const useUserNFTs = (walletAddress?: string): UseUserNFTsReturn => {
     } else {
       clearNFTs();
     }
-  }, [walletAddress]);
+  }, [walletAddress, fetchNFTs, clearNFTs]);
 
   // Cleanup cache periodically
   useEffect(() => {
@@ -161,14 +140,13 @@ export const useUserNFTs = (walletAddress?: string): UseUserNFTsReturn => {
     }, 60000); // Clean every minute
 
     return () => clearInterval(cleanupInterval);
-  }, []);
+  }, []); // CACHE_DURATION is a constant
 
   return {
     nfts,
     loadingState,
     error,
     refreshNFTs,
-    loadDemoNFTs,
     clearNFTs,
     retryCount
   };
