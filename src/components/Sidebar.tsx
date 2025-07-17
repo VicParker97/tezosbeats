@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { Slider } from '@/components/ui/slider';
 import { 
   Music, 
   Home, 
@@ -60,7 +61,11 @@ export default function Sidebar({
     isShuffled,
     repeatMode,
     toggleShuffle,
-    toggleRepeat
+    toggleRepeat,
+    currentTime,
+    duration,
+    seekTo,
+    isLoading
   } = useApp();
 
   // Format duration in MM:SS format
@@ -70,6 +75,13 @@ export default function Sidebar({
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
+
+  const handleSeek = (value: number[]) => {
+    const newTime = (value[0] / 100) * duration;
+    seekTo(newTime);
+  };
+
+  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   const navigationItems = [
     { id: 'home', label: 'Home', icon: Home },
@@ -85,7 +97,7 @@ export default function Sidebar({
       {/* Main Sidebar */}
       <div className={`${isCollapsed ? 'w-16' : 'w-64'} h-full bg-background border-r border-border transition-all duration-300 flex flex-col`}>
       {/* Header */}
-      <div className="p-4 flex items-center justify-between">
+      <div className={`p-4 flex items-center justify-between ${isMobile ? 'pt-6' : ''}`}>
         <div className={`flex items-center gap-3 ${isCollapsed ? 'justify-center' : ''}`}>
           <Music className="w-6 h-6 text-primary" />
           {!isCollapsed && (
@@ -97,9 +109,9 @@ export default function Sidebar({
             variant="ghost"
             size="icon"
             onClick={onClose}
-            className="w-8 h-8"
+            className="w-10 h-10"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </Button>
         ) : (
           <Button
@@ -123,7 +135,7 @@ export default function Sidebar({
             <Button
               key={item.id}
               variant={activeSection === item.id || (item.id === 'playlists' && showPlaylistPanel) ? 'secondary' : 'ghost'}
-              className={`w-full ${isCollapsed ? 'justify-center px-2' : 'justify-start'} h-10`}
+              className={`w-full ${isCollapsed ? 'justify-center px-2' : 'justify-start'} ${isMobile ? 'h-12 text-base' : 'h-10'}`}
               onClick={() => {
                 if (item.onClick) {
                   item.onClick();
@@ -132,7 +144,7 @@ export default function Sidebar({
                 }
               }}
             >
-              <Icon className="w-4 h-4" />
+              <Icon className={`${isMobile ? 'w-5 h-5' : 'w-4 h-4'}`} />
               {!isCollapsed && <span className="ml-3">{item.label}</span>}
             </Button>
           );
@@ -170,7 +182,7 @@ export default function Sidebar({
                       {currentTrack.artist}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {formatDuration(currentTrack.duration)}
+                      {formatDuration(currentTime)} / {formatDuration(duration || currentTrack.duration)}
                       {currentTrack.audioUrl ? '' : ' • No audio'}
                     </p>
                   </div>
@@ -191,6 +203,20 @@ export default function Sidebar({
                     <Music className="w-5 h-5 text-muted-foreground" />
                   </AvatarFallback>
                 </Avatar>
+              </div>
+            )}
+
+            {/* Progress Bar - only show in expanded mode and with audio */}
+            {!isCollapsed && currentTrack.audioUrl && duration > 0 && (
+              <div className="space-y-2">
+                <Slider
+                  value={[progress]}
+                  onValueChange={handleSeek}
+                  max={100}
+                  step={1}
+                  className="w-full"
+                  disabled={!duration || isLoading}
+                />
               </div>
             )}
             
@@ -222,8 +248,11 @@ export default function Sidebar({
                 onClick={togglePlayPause}
                 className="w-10 h-10 shadow-lg hover:shadow-xl transition-all"
                 title={isPlaying ? 'Pause' : 'Play'}
+                disabled={!currentTrack.audioUrl || isLoading}
               >
-                {isPlaying ? (
+                {isLoading ? (
+                  <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                ) : isPlaying ? (
                   <Pause className="w-4 h-4" />
                 ) : (
                   <Play className="w-4 h-4 ml-0.5" />
@@ -268,13 +297,13 @@ export default function Sidebar({
             variant="ghost"
             size={isCollapsed ? 'icon' : 'default'}
             onClick={onThemeToggle}
-            className={`${isCollapsed ? 'w-full justify-center px-2' : 'flex-1 justify-start'} h-10`}
+            className={`${isCollapsed ? 'w-full justify-center px-2' : 'flex-1 justify-start'} ${isMobile ? 'h-12 text-base' : 'h-10'}`}
             title="Toggle theme"
           >
-            {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            {!isCollapsed && <span className="ml-3">Theme</span>}
+            {isDark ? <Sun className={`${isMobile ? 'w-5 h-5' : 'w-4 h-4'}`} /> : <Moon className={`${isMobile ? 'w-5 h-5' : 'w-4 h-4'}`} />}
+            {!isCollapsed && <span className="ml-3">{isDark ? 'Light Mode' : 'Dark Mode'}</span>}
           </Button>
-          {!isCollapsed && <KeyboardShortcutsHelp />}
+          {!isCollapsed && !isMobile && <KeyboardShortcutsHelp />}
         </div>
 
         {/* Wallet connection */}
@@ -294,10 +323,10 @@ export default function Sidebar({
             <Button
               variant="outline"
               size={isCollapsed ? 'icon' : 'default'}
-              className={`w-full ${isCollapsed ? 'justify-center px-2' : 'justify-start'} h-10`}
+              className={`w-full ${isCollapsed ? 'justify-center px-2' : 'justify-start'} ${isMobile ? 'h-12 text-base' : 'h-10'}`}
               onClick={wallet.disconnect}
             >
-              <Wallet className="w-4 h-4" />
+              <Wallet className={`${isMobile ? 'w-5 h-5' : 'w-4 h-4'}`} />
               {!isCollapsed && <span className="ml-3">Disconnect</span>}
             </Button>
           </div>
@@ -305,16 +334,16 @@ export default function Sidebar({
           <Button
             variant="outline"
             size={isCollapsed ? 'icon' : 'default'}
-            className={`w-full ${isCollapsed ? 'justify-center px-2' : 'justify-start'} h-10`}
+            className={`w-full ${isCollapsed ? 'justify-center px-2' : 'justify-start'} ${isMobile ? 'h-12 text-base' : 'h-10'}`}
             onClick={wallet.connect}
             disabled={wallet.isConnecting}
           >
             {wallet.isConnecting ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className={`${isMobile ? 'w-5 h-5' : 'w-4 h-4'} animate-spin`} />
             ) : wallet.state === WalletState.ERROR ? (
-              <AlertCircle className="w-4 h-4" />
+              <AlertCircle className={`${isMobile ? 'w-5 h-5' : 'w-4 h-4'}`} />
             ) : (
-              <Wallet className="w-4 h-4" />
+              <Wallet className={`${isMobile ? 'w-5 h-5' : 'w-4 h-4'}`} />
             )}
             {!isCollapsed && (
               <span className="ml-3">

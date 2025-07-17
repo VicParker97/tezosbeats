@@ -4,6 +4,8 @@ import { useApp } from '@/contexts/AppContext';
 import Sidebar from '@/components/Sidebar';
 import MainContent from '@/components/MainContent';
 import AudioPlayer from '@/components/AudioPlayer';
+import MobilePlayer from '@/components/MobilePlayer';
+import MobilePlayerBar from '@/components/MobilePlayerBar';
 import { useEffect, useState } from 'react';
 import { WalletState } from '@/hooks/useWallet';
 import { Button } from '@/components/ui/button';
@@ -27,6 +29,8 @@ export default function Home() {
     toggleLike,
     isMobile,
     wallet,
+    isMobilePlayerOpen,
+    closeMobilePlayer,
   } = useApp();
 
   // Redirect to home when wallet disconnects
@@ -60,26 +64,19 @@ export default function Home() {
 
       {/* Mobile Header */}
       {isMobile && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-background border-b border-border px-4 py-3">
+        <div className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border px-4 py-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setIsMobileMenuOpen(true)}
-                className="md:hidden"
+                className="w-10 h-10"
               >
                 <Menu className="w-5 h-5" />
               </Button>
               <h1 className="text-lg font-bold text-foreground">TezosBeats</h1>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleTheme}
-            >
-              {isDark ? '☀️' : '🌙'}
-            </Button>
           </div>
         </div>
       )}
@@ -94,7 +91,7 @@ export default function Home() {
           />
           
           {/* Menu panel */}
-          <div className="fixed top-0 left-0 h-full w-64 bg-background border-r border-border">
+          <div className="fixed top-0 left-0 h-full w-80 bg-background border-r border-border shadow-2xl animate-in slide-in-from-left duration-300">
             <Sidebar 
               onThemeToggle={toggleTheme} 
               isDark={isDark} 
@@ -111,7 +108,7 @@ export default function Home() {
       )}
 
       {/* Main Content Area */}
-      <div className={`flex-1 ${isMobile ? 'pt-16' : ''}`}>
+      <div className={`flex-1 ${isMobile ? 'pt-16' : ''} ${isMobile && currentTrack ? 'pb-20' : ''}`}>
         <MainContent
           tracks={tracks}
           currentTrack={currentTrack}
@@ -126,17 +123,17 @@ export default function Home() {
       {/* Audio Player (Hidden) */}
       <AudioPlayer />
 
-      {/* Mobile Sidebar Overlay */}
+      {/* Mobile Player Components */}
       {isMobile && (
-        <div className="fixed top-4 left-4 z-50">
-          <button
-            onClick={toggleTheme}
-            className="p-2 rounded-lg bg-background border border-border shadow-lg"
-          >
-            {isDark ? '☀️' : '🌙'}
-          </button>
-        </div>
+        <>
+          <MobilePlayerBar />
+          <MobilePlayer 
+            isOpen={isMobilePlayerOpen}
+            onClose={closeMobilePlayer}
+          />
+        </>
       )}
+
     </div>
   );
 }

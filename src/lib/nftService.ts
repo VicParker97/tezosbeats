@@ -328,15 +328,24 @@ class NFTService {
   }
 
   private extractImageUrl(metadata: NFTMetadata): string | null {
+    const metadataRecord = metadata as Record<string, unknown>;
+    
     const imageFields = [
       metadata.display_uri,
-      ((metadata as Record<string, unknown>).displayUri && typeof (metadata as Record<string, unknown>).displayUri === 'string' ? (metadata as Record<string, unknown>).displayUri as string : null),
+      metadataRecord.displayUri && typeof metadataRecord.displayUri === 'string' ? metadataRecord.displayUri as string : null,
       metadata.thumbnail_uri,
-      ((metadata as Record<string, unknown>).thumbnailUri && typeof (metadata as Record<string, unknown>).thumbnailUri === 'string' ? (metadata as Record<string, unknown>).thumbnailUri as string : null),
+      metadataRecord.thumbnailUri && typeof metadataRecord.thumbnailUri === 'string' ? metadataRecord.thumbnailUri as string : null,
       metadata.image,
+      metadataRecord.image_uri && typeof metadataRecord.image_uri === 'string' ? metadataRecord.image_uri as string : null,
+      metadataRecord.imageUri && typeof metadataRecord.imageUri === 'string' ? metadataRecord.imageUri as string : null,
+      metadataRecord.cover && typeof metadataRecord.cover === 'string' ? metadataRecord.cover as string : null,
+      metadataRecord.cover_uri && typeof metadataRecord.cover_uri === 'string' ? metadataRecord.cover_uri as string : null,
+      metadataRecord.coverUri && typeof metadataRecord.coverUri === 'string' ? metadataRecord.coverUri as string : null,
+      metadataRecord.picture && typeof metadataRecord.picture === 'string' ? metadataRecord.picture as string : null,
+      metadataRecord.preview && typeof metadataRecord.preview === 'string' ? metadataRecord.preview as string : null,
       // Only use artifact_uri if it's actually an image
       metadata.artifact_uri && this.isImageUrl(metadata.artifact_uri) ? metadata.artifact_uri : null,
-      ((metadata as Record<string, unknown>).artifactUri && typeof (metadata as Record<string, unknown>).artifactUri === 'string' && this.isImageUrl((metadata as Record<string, unknown>).artifactUri as string)) ? (metadata as Record<string, unknown>).artifactUri as string : null
+      metadataRecord.artifactUri && typeof metadataRecord.artifactUri === 'string' && this.isImageUrl(metadataRecord.artifactUri as string) ? metadataRecord.artifactUri as string : null
     ];
 
     for (const field of imageFields) {
@@ -398,9 +407,27 @@ class NFTService {
   }
 
   private isImageUrl(url: string): boolean {
-    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp'];
+    if (!url) return false;
+    
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp', '.bmp', '.tiff'];
     const lowerUrl = url.toLowerCase();
-    return imageExtensions.some(ext => lowerUrl.includes(ext));
+    
+    // Check for file extensions
+    const hasImageExtension = imageExtensions.some(ext => lowerUrl.includes(ext));
+    if (hasImageExtension) return true;
+    
+    // Check for common image hosting patterns (some NFTs don't have extensions)
+    const imagePatterns = [
+      /\/image\//, 
+      /\/img\//, 
+      /\/picture\//, 
+      /\/thumbnail\//, 
+      /\/cover\//,
+      /image=/, 
+      /type=image/
+    ];
+    
+    return imagePatterns.some(pattern => pattern.test(lowerUrl));
   }
 
   private resolveIpfsUrl(url: string): string {

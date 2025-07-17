@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { Track } from '@/lib/mockData';
 import { useWallet, UseWalletReturn, WalletState } from '@/hooks/useWallet';
 import { useUserNFTs, UseUserNFTsReturn, NFTLoadingState } from '@/hooks/useUserNFTs';
@@ -30,6 +30,9 @@ interface AppContextType {
   repeatMode: RepeatMode;
   playQueue: Track[];
   queueIndex: number;
+  currentTime: number;
+  duration: number;
+  isLoading: boolean;
   
   // Player actions
   setCurrentTrack: (track: Track) => void;
@@ -38,12 +41,18 @@ interface AppContextType {
   previousTrack: () => void;
   toggleShuffle: () => void;
   toggleRepeat: () => void;
+  seekTo: (time: number) => void;
+  updateProgress: (currentTime: number, duration: number) => void;
+  setLoading: (loading: boolean) => void;
   
   // Track actions
   toggleLike: (trackId: string) => void;
   
   // UI state
   isMobile: boolean;
+  isMobilePlayerOpen: boolean;
+  openMobilePlayer: () => void;
+  closeMobilePlayer: () => void;
   
   // Wallet
   wallet: UseWalletReturn;
@@ -102,6 +111,11 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [repeatMode, setRepeatMode] = useState<RepeatMode>(RepeatMode.NONE);
   const [playQueue, setPlayQueue] = useState<Track[]>([]);
   const [queueIndex, setQueueIndex] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isMobilePlayerOpen, setIsMobilePlayerOpen] = useState(false);
+  const [seekingRef] = useState({ current: null as number | null });
   
   // Use ref to prevent infinite loops during track updates
   const isUpdatingTracksRef = useRef(false);
@@ -134,7 +148,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   // Initialize NFTs hook
   const nfts = useUserNFTs(wallet.walletInfo?.address);
   
-  // Initialize TezRadio hook with wallet address
+  // Initialize TezRadio hook with wallet address  
   const tezRadio = useTezRadio(wallet.walletInfo?.address);
   
   // Initialize playlists
@@ -179,7 +193,67 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }));
   };
 
-  // Update tracks based on wallet state and both NFT sources
+  // Merge NFT data with TezRadio audio streaming
+  const mergeNFTsWithTezRadio = (nftTracks: MusicNFT[], tezRadioTracks: MusicNFT[]): MusicNFT[] => {
+    const tezRadioLookup = new Map();
+    
+    // Create lookup map for TezRadio tracks by contract and token ID
+    tezRadioTracks.forEach(track => {
+      if (track.contractAddress && track.tokenId) {
+        const key = `${track.contractAddress}_${track.tokenId}`;
+        tezRadioLookup.set(key, track);
+      }
+    });
+    
+    // Merge NFT tracks with TezRadio audio URLs and enhanced metadata
+    const mergedTracks = nftTracks.map(nft => {
+      const lookupKey = `${nft.contractAddress}_${nft.tokenId}`;
+      const tezRadioMatch = tezRadioLookup.get(lookupKey);
+      
+      if (tezRadioMatch) {
+        console.log(`Enhanced NFT with TezRadio audio: ${nft.title}`);
+        return {
+          ...nft,
+          // Use TezRadio's audio URL if available
+          audioUrl: tezRadioMatch.audioUrl || nft.audioUrl,
+          // Use TezRadio's enhanced metadata when available
+          title: tezRadioMatch.title || nft.title,
+          artist: tezRadioMatch.artist || nft.artist,
+          duration: tezRadioMatch.duration || nft.duration,
+          cover: tezRadioMatch.cover || nft.cover,
+        };
+      }
+      
+      return nft;
+    });
+    
+    console.log(`Merged ${nftTracks.length} NFTs with ${tezRadioTracks.length} TezRadio tracks, ${tezRadioLookup.size} potential matches`);
+    return mergedTracks;
+  };
+
+  // Separate effect to trigger TezRadio fetching when NFTs are loaded
+  useEffect(() => {
+    if (wallet.state === WalletState.CONNECTED && 
+        nfts.loadingState === NFTLoadingState.LOADED && 
+        nfts.nfts.length > 0 &&
+        tezRadio.loadingState === TezRadioLoadingState.IDLE) {
+      
+      // Extract contract/token pairs from NFT tracks
+      const tokenPairs = nfts.nfts
+        .filter(nft => nft.contractAddress && nft.tokenId)
+        .map(nft => ({
+          contractAddress: nft.contractAddress!,
+          tokenId: nft.tokenId!
+        }));
+      
+      if (tokenPairs.length > 0) {
+        console.log(`NFTs loaded, fetching TezRadio data for ${tokenPairs.length} tokens`);
+        tezRadio.fetchTracksByTokens(tokenPairs);
+      }
+    }
+  }, [wallet.state, nfts.loadingState, nfts.nfts.length, tezRadio.loadingState]);
+
+  // Update tracks based on wallet state, NFTs, and TezRadio data
   useEffect(() => {
     if (isUpdatingTracksRef.current) {
       return; // Prevent re-entrant updates
@@ -188,18 +262,35 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     isUpdatingTracksRef.current = true;
     
     if (wallet.state === WalletState.CONNECTED) {
-      // Combine tracks from both sources when wallet is connected
-      const nftTracks = nfts.loadingState === NFTLoadingState.LOADED ? convertNFTsToTracks(nfts.nfts) : [];
-      const tezRadioTracks = tezRadio.loadingState === TezRadioLoadingState.LOADED ? convertNFTsToTracks(tezRadio.tracks) : [];
+      // Get NFTs from TzKT API
+      const nftTracks = nfts.loadingState === NFTLoadingState.LOADED ? nfts.nfts : [];
       
-      // Merge tracks and deduplicate by ID
-      const allTracks = [...nftTracks, ...tezRadioTracks];
-      const uniqueTracks = allTracks.filter((track, index, array) => 
-        array.findIndex(t => t.id === track.id) === index
-      );
+      // Merge NFT data with TezRadio audio when both are loaded
+      let mergedNFTs: MusicNFT[] = [];
+      if (nfts.loadingState === NFTLoadingState.LOADED) {
+        const tezRadioTracks = tezRadio.loadingState === TezRadioLoadingState.LOADED ? tezRadio.tracks : [];
+        
+        if (tezRadio.loadingState === TezRadioLoadingState.LOADED) {
+          // Both sources loaded - merge them
+          mergedNFTs = mergeNFTsWithTezRadio(nftTracks, tezRadioTracks);
+        } else {
+          // Only NFTs loaded - use NFT data (TezRadio still loading)
+          mergedNFTs = nftTracks;
+        }
+      }
       
-      setTracks(uniqueTracks);
-      console.log(`Updated tracks: ${nftTracks.length} from NFT service + ${tezRadioTracks.length} from TezRadio = ${uniqueTracks.length} total (after deduplication)`);
+      const finalTracks = convertNFTsToTracks(mergedNFTs);
+      
+      setTracks(finalTracks);
+      console.log(`Updated tracks: ${finalTracks.length} (${nftTracks.length} NFTs + ${tezRadio.tracks.length} TezRadio)`, {
+        walletAddress: wallet.walletInfo?.address,
+        nftLoadingState: nfts.loadingState,
+        tezRadioLoadingState: tezRadio.loadingState,
+        nftError: nfts.error,
+        tezRadioError: tezRadio.error,
+        mergedCount: mergedNFTs.length,
+        sampleTrack: finalTracks[0] || null
+      });
     } else {
       // Clear everything when wallet is disconnected
       setTracks([]);
@@ -208,6 +299,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       setPlayQueue([]);
       setQueueIndex(0);
       setCurrentPlaylist(null);
+      setCurrentTime(0);
+      setDuration(0);
+      setIsLoading(false);
       console.log('Wallet disconnected - cleared player state');
     }
     
@@ -215,7 +309,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     setTimeout(() => {
       isUpdatingTracksRef.current = false;
     }, 100);
-  }, [wallet.state, nfts.loadingState, nfts.nfts, tezRadio.loadingState, tezRadio.tracks]);
+  }, [wallet.state, wallet.walletInfo?.address, nfts.loadingState, nfts.nfts, tezRadio.loadingState, tezRadio.tracks, nfts.error, tezRadio.error]);
 
   // Reset current track if it's not in the tracks list (separate effect)
   useEffect(() => {
@@ -361,6 +455,37 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   };
   
+  const seekTo = useCallback((time: number) => {
+    console.log('Seeking to:', time);
+    seekingRef.current = time;
+    setCurrentTime(time);
+    // Clear seeking flag after a short delay
+    setTimeout(() => {
+      seekingRef.current = null;
+    }, 100);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const updateProgress = useCallback((currentTime: number, duration: number) => {
+    if (seekingRef.current === null) {
+      setCurrentTime(currentTime);
+    }
+    setDuration(duration);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const setLoadingState = useCallback((loading: boolean) => {
+    setIsLoading(loading);
+  }, []);
+
+  const openMobilePlayer = useCallback(() => {
+    setIsMobilePlayerOpen(true);
+  }, []);
+
+  const closeMobilePlayer = useCallback(() => {
+    setIsMobilePlayerOpen(false);
+  }, []);
+
   const toggleLike = (trackId: string) => {
     setTracks(prevTracks =>
       prevTracks.map(track =>
@@ -515,6 +640,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     repeatMode,
     playQueue,
     queueIndex,
+    currentTime,
+    duration,
+    isLoading,
     
     // Player actions
     setCurrentTrack,
@@ -523,12 +651,18 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     previousTrack,
     toggleShuffle,
     toggleRepeat,
+    seekTo,
+    updateProgress,
+    setLoading: setLoadingState,
     
     // Track actions
     toggleLike,
     
     // UI state
     isMobile,
+    isMobilePlayerOpen,
+    openMobilePlayer,
+    closeMobilePlayer,
     
     // Wallet
     wallet,

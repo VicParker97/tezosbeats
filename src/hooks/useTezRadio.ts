@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { fetchTezRadioTracksForWallet, searchTezRadioTracksForWallet, TezRadioTrack } from '@/lib/tezradioService';
+import { fetchTezRadioTracksForWallet, searchTezRadioTracksForWallet, fetchTezRadioTracksByTokens, TezRadioTrack } from '@/lib/tezradioService';
 import { convertTezRadioTracksToMusicNFTs } from '@/lib/dataAdapter';
 import { MusicNFT } from '@/lib/nftService';
 
@@ -18,6 +18,7 @@ export interface UseTezRadioReturn {
   error: string | null;
   searchTracks: (searchTerm: string) => Promise<void>;
   refreshTracks: () => Promise<void>;
+  fetchTracksByTokens: (tokenPairs: Array<{contractAddress: string, tokenId: string}>) => Promise<void>;
   clearTracks: () => void;
 }
 
@@ -46,7 +47,12 @@ export const useTezRadio = (walletAddress?: string): UseTezRadioReturn => {
       setTracks(convertedTracks);
       setLoadingState(TezRadioLoadingState.LOADED);
       
-      console.log(`Successfully loaded ${convertedTracks.length} tracks from TezRadio for wallet`);
+      console.log(`Successfully loaded ${convertedTracks.length} tracks from TezRadio for wallet`, {
+        rawTracks: tezRadioTracks.length,
+        convertedTracks: convertedTracks.length,
+        sampleRawTrack: tezRadioTracks[0] || null,
+        sampleConvertedTrack: convertedTracks[0] || null
+      });
 
     } catch (err) {
       console.error('Failed to fetch TezRadio tracks:', err);
@@ -67,20 +73,22 @@ export const useTezRadio = (walletAddress?: string): UseTezRadioReturn => {
     await fetchAndConvertTracks(() => searchTezRadioTracksForWallet(searchTerm, walletAddress));
   }, [fetchAndConvertTracks, walletAddress]);
 
+  const fetchTracksByTokens = useCallback(async (tokenPairs: Array<{contractAddress: string, tokenId: string}>) => {
+    await fetchAndConvertTracks(() => fetchTezRadioTracksByTokens(tokenPairs));
+  }, [fetchAndConvertTracks]);
+
   const clearTracks = useCallback(() => {
     setTracks([]);
     setLoadingState(TezRadioLoadingState.IDLE);
     setError(null);
   }, []);
 
-  // Auto-load tracks when wallet address changes
+  // Only clear tracks when wallet disconnects, don't auto-load
   useEffect(() => {
-    if (walletAddress) {
-      refreshTracks();
-    } else {
+    if (!walletAddress) {
       clearTracks();
     }
-  }, [walletAddress, refreshTracks, clearTracks]);
+  }, [walletAddress, clearTracks]);
 
   return {
     tracks,
@@ -88,6 +96,7 @@ export const useTezRadio = (walletAddress?: string): UseTezRadioReturn => {
     error,
     searchTracks,
     refreshTracks,
+    fetchTracksByTokens,
     clearTracks
   };
 };

@@ -33,27 +33,7 @@ class MetadataEnhancer {
     tokenId: string, 
     fallbackMetadata: NFTMetadata
   ): Promise<EnhancedMetadata> {
-    try {
-      // First, try to get enhanced data from TezRadio
-      const tezRadioData = await this.getTezRadioMetadata(contractAddress, tokenId);
-      
-      if (tezRadioData) {
-        return {
-          title: tezRadioData.track_title || this.extractTitleFromMetadata(fallbackMetadata),
-          artist: tezRadioData.artist_name || this.extractArtistFromMetadata(fallbackMetadata),
-          duration: tezRadioData.duration_seconds || this.extractDurationFromMetadata(fallbackMetadata),
-          cover: tezRadioData.thumbnail_ipfs_uri ? this.resolveIpfsUrl(tezRadioData.thumbnail_ipfs_uri) : undefined,
-          audioUrl: tezRadioData.audio_ipfs_uri ? this.resolveIpfsUrl(tezRadioData.audio_ipfs_uri) : undefined,
-          collection: `Contract ${contractAddress.slice(0, 8)}...`,
-          description: tezRadioData.description || undefined,
-          source: 'tezradio'
-        };
-      }
-    } catch (error) {
-      console.warn('Failed to enhance metadata from TezRadio:', error);
-    }
-
-    // Fallback to extracting from NFT metadata
+    // Process NFT metadata directly (TezRadio merging is now handled in AppContext)
     return {
       title: this.extractTitleFromMetadata(fallbackMetadata),
       artist: this.extractArtistFromMetadata(fallbackMetadata),
@@ -110,7 +90,37 @@ class MetadataEnhancer {
    * Extract title from NFT metadata with fallbacks
    */
   private extractTitleFromMetadata(metadata: NFTMetadata): string {
-    return metadata.name || 'Untitled Track';
+    // Strategy 1: Direct name field
+    if (metadata.name) {
+      return metadata.name;
+    }
+
+    // Strategy 2: Check for title field
+    const metadataRecord = metadata as Record<string, unknown>;
+    if (metadataRecord.title && typeof metadataRecord.title === 'string') {
+      return metadataRecord.title;
+    }
+
+    // Strategy 3: Check attributes for title-related fields
+    if (metadata.attributes) {
+      const titleFields = ['title', 'track_name', 'song_name', 'name'];
+      const titleAttr = metadata.attributes.find(attr => 
+        titleFields.includes(attr.name.toLowerCase())
+      );
+      if (titleAttr) {
+        return titleAttr.value;
+      }
+    }
+
+    // Strategy 4: Check description for title pattern (some collections store it there)
+    if (metadata.description) {
+      const titleMatch = metadata.description.match(/^([^-\n]+)/);
+      if (titleMatch && titleMatch[1] && titleMatch[1].trim().length > 0) {
+        return titleMatch[1].trim();
+      }
+    }
+
+    return 'Untitled Track';
   }
 
   /**
@@ -130,12 +140,28 @@ class MetadataEnhancer {
 
     // Strategy 3: Check attributes for artist-related fields
     if (metadata.attributes) {
-      const artistFields = ['artist', 'creator', 'author', 'musician', 'producer', 'composer'];
+      const artistFields = ['artist', 'creator', 'author', 'musician', 'producer', 'composer', 'by', 'made_by'];
       const artistAttr = metadata.attributes.find(attr => 
         artistFields.includes(attr.name.toLowerCase())
       );
       if (artistAttr) {
         return artistAttr.value;
+      }
+    }
+
+    // Strategy 4: Parse from description (some collections format as "Title - Artist")
+    if (metadata.description) {
+      const artistMatch = metadata.description.match(/^[^-]+-\s*(.+)/);
+      if (artistMatch && artistMatch[1] && artistMatch[1].trim().length > 0) {
+        return artistMatch[1].trim();
+      }
+    }
+
+    // Strategy 5: Check for common alternate field names
+    const alternateFields = ['created_by', 'performer', 'band', 'singer'];
+    for (const field of alternateFields) {
+      if (metadataRecord[field] && typeof metadataRecord[field] === 'string') {
+        return metadataRecord[field] as string;
       }
     }
 

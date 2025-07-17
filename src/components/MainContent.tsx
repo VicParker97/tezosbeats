@@ -8,12 +8,14 @@ import PlaylistManager from './PlaylistManager';
 import PlaylistEditor from './PlaylistEditor';
 import HomePage from './HomePage';
 import { Playlist } from '@/lib/playlistTypes';
+import { playlistService } from '@/lib/playlistService';
 import TrackItem from './TrackItem';
 import { TrackListSkeleton, NFTLoadingCard } from './LoadingStates';
 import { WalletNotConnectedState, ErrorState } from './EmptyStates';
 import { useApp } from '@/contexts/AppContext';
 import { WalletState } from '@/hooks/useWallet';
 import { NFTLoadingState } from '@/hooks/useUserNFTs';
+import { TezRadioLoadingState } from '@/hooks/useTezRadio';
 import { Track } from '@/lib/mockData';
 
 interface MainContentProps {
@@ -37,7 +39,7 @@ export default function MainContent({
 }: MainContentProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [editingPlaylist, setEditingPlaylist] = useState<Playlist | null>(null);
-  const { wallet, nfts, currentPlaylist } = useApp();
+  const { wallet, nfts, tezRadio, currentPlaylist } = useApp();
   
 
   const filteredTracks = tracks.filter(track =>
@@ -77,7 +79,11 @@ export default function MainContent({
               <div className="flex gap-2 justify-center">
                 <Button onClick={nfts.refreshNFTs} variant="outline">
                   <RefreshCw className="w-4 h-4 mr-2" />
-                  Refresh
+                  Refresh NFTs
+                </Button>
+                <Button onClick={tezRadio.refreshTracks} variant="outline">
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Refresh Audio
                 </Button>
               </div>
             )}
@@ -127,8 +133,9 @@ export default function MainContent({
         );
       
       case WalletState.CONNECTED:
-        // Show loading state while fetching NFTs
-        if (nfts.loadingState === NFTLoadingState.LOADING) {
+        // Show loading state while fetching NFTs or audio
+        const isLoading = nfts.loadingState === NFTLoadingState.LOADING || tezRadio.loadingState === TezRadioLoadingState.LOADING;
+        if (isLoading) {
           return (
             <div className="space-y-6">
               <NFTLoadingCard />
@@ -137,7 +144,7 @@ export default function MainContent({
           );
         }
 
-        // Show error state
+        // Show error state for NFTs
         if (nfts.loadingState === NFTLoadingState.ERROR) {
           return (
             <ErrorState
@@ -146,6 +153,12 @@ export default function MainContent({
               onRetry={nfts.refreshNFTs}
             />
           );
+        }
+
+        // Show error state for TezRadio (only if NFTs loaded successfully but TezRadio failed)
+        if (nfts.loadingState === NFTLoadingState.LOADED && tezRadio.loadingState === TezRadioLoadingState.ERROR) {
+          console.warn('TezRadio failed to load audio streaming:', tezRadio.error);
+          // Don't block the UI, just log the error - NFTs will still show without enhanced audio
         }
 
         // Show tracks or empty state
@@ -170,8 +183,7 @@ export default function MainContent({
           />
         ) : (
           <PlaylistManager
-            onPlaylistSelect={async (playlist) => {
-              const { playlistService } = await import('@/lib/playlistService');
+            onPlaylistSelect={(playlist) => {
               const playlistWithTracks = playlistService.getPlaylistWithTracks(playlist.id, tracks);
               if (playlistWithTracks) {
                 setEditingPlaylist(playlistWithTracks);

@@ -18,7 +18,7 @@ export const mockTracks: Track[] = [
     duration: 237,
     collection: 'Electronic Vibes',
     isLiked: true,
-    audioUrl: null
+    audioUrl: 'https://www.soundjay.com/misc/sounds-akustic/beep-07a.mp3'
   },
   {
     id: '2',

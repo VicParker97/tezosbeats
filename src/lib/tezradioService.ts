@@ -36,6 +36,54 @@ export const ipfsToGatewayUrl = (ipfsUri: string | null): string => {
     return `${IPFS_GATEWAY}${ipfsUri.substring(7)}`;
 };
 
+// Fetch TezRadio tracks by contract and token ID pairs (for hybrid approach)
+export const fetchTezRadioTracksByTokens = async (tokenPairs: Array<{contractAddress: string, tokenId: string}>): Promise<TezRadioTrack[]> => {
+    if (!tokenPairs || tokenPairs.length === 0) {
+        return [];
+    }
+
+    console.log(`Fetching TezRadio tracks for ${tokenPairs.length} contract/token pairs`);
+
+    let allTracks: TezRadioTrack[] = [];
+    
+    // Process in batches to avoid query size limits
+    const batchSize = 50;
+    for (let i = 0; i < tokenPairs.length; i += batchSize) {
+        const batch = tokenPairs.slice(i, i + batchSize);
+        
+        // Build OR conditions for this batch
+        const orConditions = batch.map(pair => 
+            `and(contract_address.eq.${pair.contractAddress},token_id.eq.${pair.tokenId})`
+        ).join(',');
+
+        const { data, error } = await supabase
+            .from('music_nfts')
+            .select('*')
+            .or(orConditions)
+            .not('audio_ipfs_uri', 'is', null)
+            .order('id', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching TezRadio tracks batch:', error);
+            continue; // Continue with other batches
+        }
+
+        if (data && data.length > 0) {
+            allTracks = allTracks.concat(data);
+        }
+    }
+    
+    // Normalize tracks
+    const normalizedTracks = allTracks.map(t => ({
+        ...t,
+        track_title: t.track_title || 'Untitled Track',
+        artist_name: t.artist_name || 'Unknown Artist',
+    }));
+
+    console.log(`Found ${normalizedTracks.length} TezRadio tracks matching ${tokenPairs.length} token pairs`);
+    return normalizedTracks;
+};
+
 export const fetchTezRadioTracksForWallet = async (walletAddress: string): Promise<TezRadioTrack[]> => {
     if (!walletAddress) {
         return [];
